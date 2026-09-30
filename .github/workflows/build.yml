@@ -1,16 +1,13 @@
-name: Build Arabic Puzzle Game APK
+name: Build Arabic Mobile Puzzle Game APK
 
 on:
   push:
     branches: [ "main", "master" ]
   workflow_dispatch:
 
-permissions:
-  contents: write
-
 jobs:
   build-apk:
-    name: Build Arabic Puzzle Game APK
+    name: Generate & Build Android APK
     runs-on: ubuntu-latest
 
     steps:
@@ -20,69 +17,71 @@ jobs:
       - name: Set up JDK 17
         uses: actions/setup-java@v4
         with:
-          java-version: '17'
           distribution: 'temurin'
+          java-version: '17'
 
       - name: Accept Android SDK Licenses
         run: |
           yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses || true
 
-      - name: Generate Game and Android Project Code
+      - name: Scaffold Android Game Project
         run: |
-          python3 - << 'PY_EOF'
-          import os
+          # Create directory structure
+          mkdir -p app/src/main/java/com/ammar/puzzle
+          mkdir -p app/src/main/res/values
+          mkdir -p app/src/main/res/drawable
+          mkdir -p app/src/main/assets
 
-          os.makedirs("app/src/main/java/com/ammar/alghaz", exist_ok=True)
-          os.makedirs("app/src/main/res/drawable", exist_ok=True)
-          os.makedirs("app/src/main/res/values", exist_ok=True)
-          os.makedirs("app/src/main/assets", exist_ok=True)
-
-          with open("settings.gradle", "w", encoding="utf-8") as f:
-              f.write('''pluginManagement {
-              repositories {
-                  google()
-                  mavenCentral()
-                  gradlePluginPortal()
-              }
-          }
-          dependencyResolutionManagement {
-              repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
+          # 1. Root build.gradle
+          cat << 'EOF' > build.gradle
+          buildscript {
               repositories {
                   google()
                   mavenCentral()
               }
+              dependencies {
+                  classpath 'com.android.tools.build:gradle:8.2.2'
+                  classpath 'org.jetbrains.kotlin:kotlin-gradle-plugin:1.9.22'
+              }
           }
-          rootProject.name = "AlghazGame"
+          allprojects {
+              repositories {
+                  google()
+                  mavenCentral()
+              }
+          }
+          EOF
+
+          # 2. settings.gradle
+          cat << 'EOF' > settings.gradle
+          rootProject.name = "AlghazAmmar"
           include ':app'
-          ''')
+          EOF
 
-          with open("build.gradle", "w", encoding="utf-8") as f:
-              f.write('''plugins {
-              id 'com.android.application' version '8.2.2' apply false
-          }
-          ''')
-
-          with open("gradle.properties", "w", encoding="utf-8") as f:
-              f.write('''org.gradle.jvmargs=-Xmx2048m -Dfile.encoding=UTF-8
+          # 3. gradle.properties
+          cat << 'EOF' > gradle.properties
+          org.gradle.jvmargs=-Xmx2048m -Dfile.encoding=UTF-8
           android.useAndroidX=true
-          android.nonTransitiveRClass=true
-          ''')
+          android.enableJetifier=true
+          EOF
 
-          with open("app/build.gradle", "w", encoding="utf-8") as f:
-              f.write('''plugins {
+          # 4. app/build.gradle
+          cat << 'EOF' > app/build.gradle
+          plugins {
               id 'com.android.application'
+              id 'kotlin-android'
           }
 
           android {
-              namespace 'com.ammar.alghaz'
+              namespace 'com.ammar.puzzle'
               compileSdk 34
 
               defaultConfig {
-                  applicationId "com.ammar.alghaz"
-                  minSdk 21
+                  applicationId "com.ammar.puzzle"
+                  minSdk 24
                   targetSdk 34
                   versionCode 1
-                  versionName "1.0"
+                  versionName "1.0.0"
               }
 
               buildTypes {
@@ -91,6 +90,7 @@ jobs:
                       proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
                   }
                   debug {
+                      applicationIdSuffix ""
                       debuggable true
                   }
               }
@@ -98,2307 +98,1420 @@ jobs:
                   sourceCompatibility JavaVersion.VERSION_17
                   targetCompatibility JavaVersion.VERSION_17
               }
+              kotlinOptions {
+                  jvmTarget = '17'
+              }
           }
 
           dependencies {
+              implementation 'androidx.core:core-ktx:1.12.0'
               implementation 'androidx.appcompat:appcompat:1.6.1'
+              implementation 'com.google.android.material:material:1.11.0'
+              implementation 'androidx.webkit:webkit:1.10.0'
           }
-          ''')
+          EOF
 
-          with open("app/src/main/AndroidManifest.xml", "w", encoding="utf-8") as f:
-              f.write('''<?xml version="1.0" encoding="utf-8"?>
+          # 5. AndroidManifest.xml
+          cat << 'EOF' > app/src/main/AndroidManifest.xml
+          <?xml version="1.0" encoding="utf-8"?>
           <manifest xmlns:android="http://schemas.android.com/apk/res/android">
-
+              <uses-permission android:name="android.permission.INTERNET" />
               <uses-permission android:name="android.permission.VIBRATE" />
 
               <application
                   android:allowBackup="true"
                   android:icon="@drawable/ic_launcher"
+                  android:label="تحدي العقول - ألغاز عربية"
                   android:roundIcon="@drawable/ic_launcher"
-                  android:label="@string/app_name"
                   android:supportsRtl="true"
-                  android:hardwareAccelerated="true"
-                  android:theme="@style/Theme.App">
+                  android:theme="@style/Theme.PuzzleGame">
                   <activity
                       android:name=".MainActivity"
                       android:exported="true"
-                      android:configChanges="orientation|screenSize|screenLayout|keyboardHidden"
-                      android:screenOrientation="portrait">
+                      android:screenOrientation="portrait"
+                      android:configChanges="orientation|screenSize|keyboardHidden">
                       <intent-filter>
                           <action android:name="android.intent.action.MAIN" />
-                          <category android:name="android.intent.action.LAUNCHER" />
+                          <category android:name="android.intent.category.LAUNCHER" />
                       </intent-filter>
                   </activity>
               </application>
           </manifest>
-          ''')
+          EOF
 
-          with open("app/src/main/res/values/strings.xml", "w", encoding="utf-8") as f:
-              f.write('''<resources>
-              <string name="app_name">عالم الألغاز</string>
-          </resources>
-          ''')
-
-          with open("app/src/main/res/values/styles.xml", "w", encoding="utf-8") as f:
-              f.write('''<resources>
-              <style name="Theme.App" parent="Theme.AppCompat.Light.NoActionBar">
-                  <item name="android:windowBackground">#0b132b</item>
-                  <item name="android:statusBarColor">#0b132b</item>
+          # 6. Android Styles & Icons
+          cat << 'EOF' > app/src/main/res/values/themes.xml
+          <resources>
+              <style name="Theme.PuzzleGame" parent="Theme.MaterialComponents.Light.NoActionBar">
+                  <item name="android:statusBarColor">#FF5722</item>
+                  <item name="android:navigationBarColor">#2A1800</item>
               </style>
           </resources>
-          ''')
+          EOF
 
-          with open("app/src/main/res/drawable/ic_launcher.xml", "w", encoding="utf-8") as f:
-              f.write('''<vector xmlns:android="http://schemas.android.com/apk/res/android"
+          cat << 'EOF' > app/src/main/res/drawable/ic_launcher.xml
+          <vector xmlns:android="http://schemas.android.com/apk/res/android"
               android:width="108dp"
               android:height="108dp"
               android:viewportWidth="108"
               android:viewportHeight="108">
               <path
-                  android:fillColor="#1c2541"
+                  android:fillColor="#FF5722"
                   android:pathData="M0,0h108v108h-108z"/>
               <path
-                  android:fillColor="#f59e0b"
-                  android:pathData="M54,20 A34,34 0 1,0 54,88 A34,34 0 1,0 54,20 Z"/>
+                  android:fillColor="#FFD700"
+                  android:pathData="M54,18 L86,36 L86,72 L54,90 L22,72 L22,36 Z"/>
               <path
-                  android:fillColor="#ffffff"
-                  android:pathData="M54,32 C48,32 44,36 44,42 L50,42 C50,39 52,37 54,37 C56.5,37 58.5,39 58.5,41.5 C58.5,44 57,45.5 54.5,47.5 C51.5,50 49.5,52.5 49.5,58 L55.5,58 C55.5,54 57.5,52 60,50 C63,47.5 64.5,45 64.5,41.5 C64.5,36 59.8,32 54,32 Z M51,64 L57,64 L57,70 L51,70 Z"/>
+                  android:fillColor="#FFFFFF"
+                  android:pathData="M54,28 L76,41 L76,67 L54,80 L32,67 L32,41 Z"/>
           </vector>
-          ''')
+          EOF
 
-          with open("app/src/main/java/com/ammar/alghaz/MainActivity.java", "w", encoding="utf-8") as f:
-              f.write('''package com.ammar.alghaz;
+          # 7. MainActivity.kt (with Native Webview & Vibration bridge)
+          cat << 'EOF' > app/src/main/java/com/ammar/puzzle/MainActivity.kt
+          package com.ammar.puzzle
 
-          import android.annotation.SuppressLint;
-          import android.app.AlertDialog;
-          import android.content.Context;
-          import android.os.Build;
-          import android.os.Bundle;
-          import android.os.VibrationEffect;
-          import android.os.Vibrator;
-          import android.webkit.JavascriptInterface;
-          import android.webkit.WebChromeClient;
-          import android.webkit.WebSettings;
-          import android.webkit.WebView;
-          import android.webkit.WebViewClient;
-          import androidx.appcompat.app.AppCompatActivity;
+          import android.annotation.SuppressLint
+          import android.content.Context
+          import android.os.Build
+          import android.os.Bundle
+          import android.os.VibrationEffect
+          import android.os.Vibrator
+          import android.webkit.JavascriptInterface
+          import android.webkit.WebChromeClient
+          import android.webkit.WebSettings
+          import android.webkit.WebView
+          import android.webkit.WebViewClient
+          import androidx.appcompat.app.AppCompatActivity
 
-          public class MainActivity extends AppCompatActivity {
-              private WebView webView;
+          class MainActivity : AppCompatActivity() {
+              private lateinit var webView: WebView
 
               @SuppressLint("SetJavaScriptEnabled")
-              @Override
-              protected void onCreate(Bundle savedInstanceState) {
-                  super.onCreate(savedInstanceState);
-                  
-                  if (getSupportActionBar() != null) {
-                      getSupportActionBar().hide();
-                  }
+              override fun onCreate(savedInstanceState: Bundle?) {
+                  super.onCreate(savedInstanceState)
+                  supportActionBar?.hide()
 
-                  webView = new WebView(this);
-                  setContentView(webView);
+                  webView = WebView(this)
+                  setContentView(webView)
 
-                  WebSettings settings = webView.getSettings();
-                  settings.setJavaScriptEnabled(true);
-                  settings.setDomStorageEnabled(true);
-                  settings.setDatabaseEnabled(true);
-                  settings.setAllowFileAccess(true);
-                  settings.setCacheMode(WebSettings.LOAD_DEFAULT);
-                  settings.setUseWideViewPort(true);
-                  settings.setLoadWithOverviewMode(true);
-                  settings.setSupportZoom(false);
-                  settings.setDisplayZoomControls(false);
+                  val settings: WebSettings = webView.settings
+                  settings.javaScriptEnabled = true
+                  settings.domStorageEnabled = true
+                  settings.allowFileAccess = true
+                  settings.allowContentAccess = true
+                  settings.mediaPlaybackRequiresUserGesture = false
+                  settings.useWideViewPort = true
+                  settings.loadWithOverviewMode = true
 
-                  webView.addJavascriptInterface(new WebAppInterface(this), "AndroidBridge");
-                  webView.setWebChromeClient(new WebChromeClient());
-                  webView.setWebViewClient(new WebViewClient());
+                  webView.webViewClient = WebViewClient()
+                  webView.webChromeClient = WebChromeClient()
+                  webView.addJavascriptInterface(WebAppInterface(this), "AndroidNative")
 
-                  webView.loadUrl("file:///android_asset/index.html");
+                  webView.loadUrl("file:///android_asset/index.html")
               }
 
-              public class WebAppInterface {
-                  Context mContext;
-
-                  WebAppInterface(Context c) {
-                      mContext = c;
-                  }
-
+              inner class WebAppInterface(private val context: Context) {
                   @JavascriptInterface
-                  public void vibrate(long milliseconds) {
-                      try {
-                          Vibrator v = (Vibrator) getSystemService(Context.VIBRATOR_SERVICE);
-                          if (v != null && v.hasVibrator()) {
-                              if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                                  v.vibrate(VibrationEffect.createOneShot(milliseconds, VibrationEffect.DEFAULT_AMPLITUDE));
-                              } else {
-                                  v.vibrate(milliseconds);
-                              }
-                          }
-                      } catch (Exception ignored) {}
+                  fun vibrate(milliseconds: Long) {
+                      val vibrator = context.getSystemService(Context.VIBRATOR_SERVICE) as? Vibrator
+                      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                          vibrator?.vibrate(VibrationEffect.createOneShot(milliseconds, VibrationEffect.DEFAULT_AMPLITUDE))
+                      } else {
+                          @Suppress("DEPRECATION")
+                          vibrator?.vibrate(milliseconds)
+                      }
                   }
               }
 
-              @Override
-              public void onBackPressed() {
-                  if (webView != null && webView.canGoBack()) {
-                      webView.goBack();
+              @Deprecated("Deprecated in Java")
+              override fun onBackPressed() {
+                  if (webView.canGoBack()) {
+                      webView.goBack()
                   } else {
-                      new AlertDialog.Builder(this)
-                          .setTitle("الخروج من اللعبة")
-                          .setMessage("هل ترغب حقاً في إغلاق اللعبة الآن؟")
-                          .setPositiveButton("نعم", (dialog, which) -> finish())
-                          .setNegativeButton("إلغاء", null)
-                          .show();
+                      super.onBackPressed()
                   }
               }
           }
-          ''')
+          EOF
 
-          with open("app/src/main/assets/index.html", "w", encoding="utf-8") as f:
-              f.write('''<!DOCTYPE html>
+      - name: Generate High-End HTML5 Arabic Game Engine
+        run: |
+          cat << 'EOF' > app/src/main/assets/index.html
+          <!DOCTYPE html>
           <html lang="ar" dir="rtl">
           <head>
             <meta charset="UTF-8">
-            <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-            <title>عالم الألغاز والذكاء</title>
+            <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+            <title>تحدي العقول - ألغاز عربية</title>
             <style>
               :root {
-                --bg: #0b132b;
-                --card-bg: rgba(28, 37, 65, 0.95);
-                --card-border: rgba(255, 255, 255, 0.1);
-                --text: #ffffff;
-                --text-muted: #94a3b8;
-                --primary: #3b82f6;
-                --primary-hover: #2563eb;
-                --accent-gold: #f59e0b;
-                --accent-green: #10b981;
-                --accent-red: #ef4444;
-                --accent-purple: #8b5cf6;
-                --modal-bg: rgba(15, 23, 42, 0.95);
-                --font-scale: 1;
+                --bg-gradient: linear-gradient(180deg, #FF5722 0%, #FF9800 45%, #FFB300 85%, #FFC107 100%);
+                --accent-blue: #00D2FF;
+                --accent-green: #00E676;
+                --accent-gold: #FFD700;
+                --text-main: #3E1E04;
+                --clay-bg: rgba(255, 255, 255, 0.24);
+                --clay-border: rgba(255, 255, 255, 0.6);
+                --clay-shadow: 0 10px 25px rgba(0, 0, 0, 0.22), inset 0 2px 4px rgba(255, 255, 255, 0.7);
               }
-
-              body.light-theme {
-                --bg: #f1f5f9;
-                --card-bg: rgba(255, 255, 255, 0.96);
-                --card-border: rgba(0, 0, 0, 0.1);
-                --text: #0f172a;
-                --text-muted: #64748b;
-                --modal-bg: rgba(255, 255, 255, 0.98);
-              }
-
-              body.font-large { --font-scale: 1.15; }
-              body.font-xlarge { --font-scale: 1.3; }
 
               * {
                 box-sizing: border-box;
+                user-select: none;
+                -webkit-user-select: none;
+                -webkit-tap-highlight-color: transparent;
                 margin: 0;
                 padding: 0;
-                user-select: none;
-                -webkit-tap-highlight-color: transparent;
-                font-family: 'Segoe UI', Tahoma, Cairo, system-ui, -apple-system, sans-serif;
+                font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, Tahoma, sans-serif;
               }
 
               body {
-                background-color: var(--bg);
-                color: var(--text);
+                background: var(--bg-gradient);
                 min-height: 100vh;
+                overflow-x: hidden;
+                color: var(--text-main);
+                display: flex;
+                justify-content: center;
+                align-items: center;
+                direction: rtl;
+              }
+
+              #app-container {
+                width: 100%;
+                max-width: 440px;
+                height: 100vh;
+                background: var(--bg-gradient);
+                position: relative;
+                overflow-y: auto;
+                overflow-x: hidden;
                 display: flex;
                 flex-direction: column;
-                overflow-x: hidden;
-                transition: background-color 0.3s ease, color 0.3s ease;
-                font-size: calc(16px * var(--font-scale));
+                box-shadow: 0 0 35px rgba(0, 0, 0, 0.35);
               }
 
               header {
                 position: sticky;
                 top: 0;
-                z-index: 100;
-                background: var(--card-bg);
-                backdrop-filter: blur(12px);
-                border-bottom: 1px solid var(--card-border);
-                padding: 12px 18px;
+                z-index: 20;
                 display: flex;
                 justify-content: space-between;
                 align-items: center;
-                box-shadow: 0 4px 20px rgba(0,0,0,0.25);
+                padding: 12px 16px;
+                background: rgba(255, 255, 255, 0.2);
+                backdrop-filter: blur(12px);
+                -webkit-backdrop-filter: blur(12px);
+                border-bottom: 2px solid rgba(255, 255, 255, 0.35);
               }
 
-              .header-logo {
-                display: flex;
-                align-items: center;
-                gap: 8px;
-                font-size: 1.15rem;
-                font-weight: 700;
-                color: var(--accent-gold);
-              }
-
-              .header-actions {
-                display: flex;
-                align-items: center;
-                gap: 10px;
-              }
-
-              .coins-badge {
+              .badge-pill {
                 display: flex;
                 align-items: center;
                 gap: 6px;
-                background: rgba(245, 158, 11, 0.15);
-                border: 1px solid rgba(245, 158, 11, 0.4);
-                color: var(--accent-gold);
-                padding: 6px 12px;
-                border-radius: 20px;
-                font-weight: 700;
-                font-size: 0.95rem;
+                padding: 6px 14px;
+                background: linear-gradient(180deg, #FFFFFF 0%, #FFF3E0 100%);
+                border-radius: 50px;
+                border: 2px solid #FFE082;
+                box-shadow: 0 4px 0 #D7A100, 0 6px 12px rgba(0, 0, 0, 0.15);
+                font-weight: 800;
+                font-size: 15px;
+                color: #795548;
               }
+              .badge-pill.coin { color: #B26A00; }
 
               .icon-btn {
-                background: rgba(255, 255, 255, 0.08);
-                border: 1px solid var(--card-border);
-                color: var(--text);
-                width: 40px;
-                height: 40px;
+                width: 44px;
+                height: 44px;
                 border-radius: 50%;
+                border: 2px solid #FFF8E1;
+                background: linear-gradient(180deg, #FFE082 0%, #FF9800 100%);
+                box-shadow: 0 4px 0 #C66900, 0 6px 10px rgba(0, 0, 0, 0.2);
                 display: flex;
                 align-items: center;
                 justify-content: center;
+                font-size: 20px;
                 cursor: pointer;
-                font-size: 1.2rem;
-                transition: transform 0.2s, background 0.2s;
+                color: #FFFFFF;
+                transition: all 0.1s ease;
               }
-              .icon-btn:active { transform: scale(0.92); }
-              .icon-btn.gift-ready {
-                animation: pulse-ring 1.8s infinite;
-                border-color: var(--accent-gold);
-              }
-
-              @keyframes pulse-ring {
-                0% { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.6); }
-                70% { box-shadow: 0 0 0 10px rgba(245, 158, 11, 0); }
-                100% { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0); }
+              .icon-btn:active {
+                transform: translateY(3px);
+                box-shadow: 0 1px 0 #C66900;
               }
 
-              main {
-                flex: 1;
+              .screen {
+                position: relative;
+                z-index: 10;
                 padding: 16px;
-                max-width: 600px;
-                margin: 0 auto;
-                width: 100%;
-              }
-
-              .view-title {
-                font-size: 1.3rem;
-                font-weight: 800;
-                margin-bottom: 6px;
-                text-align: center;
-              }
-              .view-subtitle {
-                font-size: 0.9rem;
-                color: var(--text-muted);
-                text-align: center;
-                margin-bottom: 18px;
-              }
-
-              .stages-grid {
+                flex: 1;
                 display: flex;
                 flex-direction: column;
-                gap: 14px;
+                animation: fadeIn 0.25s ease;
+              }
+              @keyframes fadeIn {
+                from { opacity: 0; transform: translateY(8px); }
+                to { opacity: 1; transform: translateY(0); }
               }
 
-              .stage-card {
-                background: var(--card-bg);
-                border: 1px solid var(--card-border);
-                border-radius: 16px;
-                padding: 16px;
-                display: flex;
-                align-items: center;
-                gap: 14px;
-                cursor: pointer;
-                transition: transform 0.2s, box-shadow 0.2s, border-color 0.2s;
-              }
-              .stage-card:active { transform: scale(0.98); }
-              .stage-card.locked {
-                opacity: 0.65;
-                cursor: not-allowed;
-                filter: grayscale(0.7);
-              }
-              .stage-card.unlocked {
-                border-color: rgba(59, 130, 246, 0.4);
-                box-shadow: 0 4px 15px rgba(59, 130, 246, 0.15);
-              }
-              .stage-card.passed { border-color: rgba(16, 185, 129, 0.5); }
-              .stage-card.mastered {
-                border-color: rgba(245, 158, 11, 0.7);
-                background: linear-gradient(135deg, var(--card-bg), rgba(245, 158, 11, 0.1));
-              }
+              .hidden { display: none !important; }
 
-              .stage-icon {
-                font-size: 2.2rem;
-                width: 54px;
-                height: 54px;
-                border-radius: 14px;
-                background: rgba(255, 255, 255, 0.06);
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                flex-shrink: 0;
-              }
-
-              .stage-info { flex: 1; }
-              .stage-title {
-                font-weight: 700;
-                font-size: 1.05rem;
-                margin-bottom: 4px;
-              }
-              .stage-desc {
-                font-size: 0.8rem;
-                color: var(--text-muted);
-                margin-bottom: 8px;
-                line-height: 1.3;
-              }
-              .stage-progress-bar {
-                height: 6px;
-                background: rgba(255, 255, 255, 0.1);
-                border-radius: 4px;
-                overflow: hidden;
-                margin-bottom: 4px;
-              }
-              .stage-progress-fill {
-                height: 100%;
-                background: linear-gradient(90deg, var(--primary), var(--accent-green));
-                border-radius: 4px;
-                transition: width 0.4s ease;
-              }
-              .stage-card.mastered .stage-progress-fill {
-                background: linear-gradient(90deg, var(--accent-gold), #f97316);
-              }
-              .stage-status-text {
-                font-size: 0.75rem;
-                color: var(--text-muted);
-                display: flex;
-                justify-content: space-between;
-              }
-
-              .stage-header-box {
-                background: var(--card-bg);
-                border: 1px solid var(--card-border);
-                border-radius: 18px;
-                padding: 16px;
-                margin-bottom: 16px;
-              }
-              .back-btn {
-                background: transparent;
+              .btn-3d {
                 border: none;
-                color: var(--accent-gold);
+                border-radius: 18px;
+                padding: 14px 20px;
+                font-size: 17px;
+                font-weight: 800;
+                color: #FFFFFF;
+                text-shadow: 0 2px 3px rgba(0, 0, 0, 0.35);
+                cursor: pointer;
                 display: inline-flex;
                 align-items: center;
-                gap: 6px;
-                font-weight: 700;
-                cursor: pointer;
-                margin-bottom: 8px;
-                font-size: 0.95rem;
+                justify-content: center;
+                gap: 10px;
+                transition: all 0.1s ease;
+                position: relative;
+                overflow: hidden;
               }
-              .rule-badge {
-                display: inline-block;
-                background: rgba(59, 130, 246, 0.15);
-                border: 1px solid rgba(59, 130, 246, 0.4);
-                color: #60a5fa;
-                padding: 4px 10px;
+              .btn-3d::after {
+                content: "";
+                position: absolute;
+                top: 2px;
+                left: 10%;
+                width: 80%;
+                height: 35%;
+                background: linear-gradient(180deg, rgba(255, 255, 255, 0.6) 0%, rgba(255, 255, 255, 0.05) 100%);
                 border-radius: 12px;
-                font-size: 0.8rem;
-                margin-top: 6px;
-                font-weight: 600;
+                pointer-events: none;
+              }
+              .btn-3d:active { transform: translateY(4px); }
+
+              .btn-green {
+                background: linear-gradient(180deg, #69F0AE 0%, #00E676 60%, #00C853 100%);
+                box-shadow: 0 6px 0 #007E33, 0 8px 15px rgba(0, 0, 0, 0.25);
+              }
+              .btn-green:active { box-shadow: 0 2px 0 #007E33; }
+
+              .btn-blue {
+                background: linear-gradient(180deg, #40C4FF 0%, #00B0FF 60%, #0091EA 100%);
+                box-shadow: 0 6px 0 #01579B, 0 8px 15px rgba(0, 0, 0, 0.25);
+              }
+              .btn-blue:active { box-shadow: 0 2px 0 #01579B; }
+
+              .btn-orange {
+                background: linear-gradient(180deg, #FFD54F 0%, #FFA000 60%, #FF6F00 100%);
+                box-shadow: 0 6px 0 #BF360C, 0 8px 15px rgba(0, 0, 0, 0.25);
+              }
+              .btn-orange:active { box-shadow: 0 2px 0 #BF360C; }
+
+              .btn-red {
+                background: linear-gradient(180deg, #FF8A80 0%, #FF5252 60%, #D50000 100%);
+                box-shadow: 0 6px 0 #8B0000, 0 8px 15px rgba(0, 0, 0, 0.25);
+              }
+              .btn-red:active { box-shadow: 0 2px 0 #8B0000; }
+
+              .clay-card {
+                background: var(--clay-bg);
+                backdrop-filter: blur(14px);
+                border: 2px solid var(--clay-border);
+                border-radius: 24px;
+                padding: 16px;
+                box-shadow: var(--clay-shadow);
+                margin-bottom: 14px;
               }
 
-              .puzzles-grid {
+              .stage-hero { text-align: center; margin-bottom: 16px; }
+              .stage-title { font-size: 26px; font-weight: 900; color: #FFFFFF; text-shadow: 0 2px 4px rgba(0, 0, 0, 0.35); }
+              .stage-subtitle { font-size: 14px; font-weight: 700; color: #FFF3E0; }
+
+              .progress-box {
+                background: rgba(0, 0, 0, 0.25);
+                border-radius: 50px;
+                padding: 4px 6px;
+                display: flex;
+                gap: 6px;
+                margin-top: 10px;
+                border: 1px solid rgba(255, 255, 255, 0.3);
+              }
+              .prog-step {
+                flex: 1;
+                height: 12px;
+                background: rgba(255, 255, 255, 0.25);
+                border-radius: 10px;
+                transition: all 0.3s ease;
+              }
+              .prog-step.done {
+                background: linear-gradient(90deg, #00E676, #76FF03);
+                box-shadow: 0 0 10px #76FF03;
+              }
+
+              .pass-criteria {
+                margin-top: 6px;
+                font-size: 13px;
+                font-weight: 800;
+                color: #FFECB3;
+                text-align: center;
+              }
+
+              .modes-grid {
                 display: grid;
                 grid-template-columns: repeat(2, 1fr);
                 gap: 12px;
-                margin-bottom: 20px;
+                margin-bottom: 16px;
               }
 
-              .puzzle-card {
-                background: var(--card-bg);
-                border: 1px solid var(--card-border);
-                border-radius: 16px;
-                padding: 14px;
-                display: flex;
-                flex-direction: column;
-                justify-content: space-between;
-                min-height: 140px;
-                cursor: pointer;
-                transition: transform 0.2s, box-shadow 0.2s, border-color 0.2s;
-              }
-              .puzzle-card:active { transform: scale(0.96); }
-              .puzzle-card.solved {
-                border-color: rgba(16, 185, 129, 0.6);
-                background: linear-gradient(145deg, var(--card-bg), rgba(16, 185, 129, 0.08));
-              }
-              .puzzle-way-num {
-                font-size: 0.75rem;
-                font-weight: 700;
-                padding: 2px 8px;
-                border-radius: 8px;
-                background: rgba(255, 255, 255, 0.08);
-                width: fit-content;
-                margin-bottom: 6px;
-              }
-              .puzzle-card-title {
-                font-weight: 700;
-                font-size: 0.95rem;
-                margin-bottom: 4px;
-              }
-              .puzzle-card-cat {
-                font-size: 0.75rem;
-                color: var(--text-muted);
-              }
-              .puzzle-card-status {
-                align-self: flex-start;
-                margin-top: 10px;
-                font-size: 0.8rem;
-                font-weight: 700;
-                display: flex;
-                align-items: center;
-                gap: 4px;
-              }
-              .puzzle-card.solved .puzzle-card-status { color: var(--accent-green); }
-              .puzzle-card:not(.solved) .puzzle-card-status { color: var(--accent-gold); }
-
-              .modal-overlay {
-                position: fixed;
-                top: 0; left: 0; right: 0; bottom: 0;
-                background: rgba(0, 0, 0, 0.75);
-                backdrop-filter: blur(8px);
-                z-index: 500;
-                display: none;
-                align-items: center;
-                justify-content: center;
-                padding: 16px;
-              }
-              .modal-overlay.active { display: flex; animation: fadeIn 0.25s ease-out; }
-              .modal-box {
-                background: var(--modal-bg);
-                border: 1px solid var(--card-border);
+              .mode-card {
+                background: linear-gradient(160deg, rgba(255, 255, 255, 0.95) 0%, rgba(255, 248, 225, 0.9) 100%);
                 border-radius: 20px;
-                width: 100%;
-                max-width: 500px;
-                max-height: 90vh;
-                overflow-y: auto;
-                padding: 22px;
-                box-shadow: 0 10px 40px rgba(0,0,0,0.5);
-                animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1);
-              }
-              @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-              @keyframes slideUp { from { transform: translateY(30px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
-
-              .modal-header {
-                display: flex;
-                justify-content: space-between;
-                align-items: center;
-                margin-bottom: 16px;
-                padding-bottom: 12px;
-                border-bottom: 1px solid var(--card-border);
-              }
-              .modal-title {
-                font-size: 1.15rem;
-                font-weight: 800;
-                display: flex;
-                align-items: center;
-                gap: 8px;
-              }
-              .close-modal-btn {
-                background: rgba(255, 255, 255, 0.1);
-                border: none;
-                color: var(--text);
-                width: 32px;
-                height: 32px;
-                border-radius: 50%;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                font-size: 1rem;
-                cursor: pointer;
-              }
-
-              .puzzle-question-text {
-                font-size: 1.15rem;
-                font-weight: 700;
-                line-height: 1.5;
-                text-align: center;
-                margin: 16px 0 20px;
-                padding: 12px;
-                background: rgba(255, 255, 255, 0.04);
-                border-radius: 12px;
-              }
-
-              .options-list {
+                padding: 14px 10px;
                 display: flex;
                 flex-direction: column;
-                gap: 10px;
-                margin-bottom: 16px;
-              }
-              .option-btn {
-                background: rgba(255, 255, 255, 0.06);
-                border: 1px solid var(--card-border);
-                color: var(--text);
-                padding: 14px 16px;
-                border-radius: 12px;
-                font-size: 1rem;
-                font-weight: 600;
-                text-align: right;
+                align-items: center;
+                text-align: center;
                 cursor: pointer;
-                transition: all 0.2s;
+                border: 2px solid #FFE082;
+                box-shadow: 0 6px 0 #E0A800, 0 10px 18px rgba(0, 0, 0, 0.15);
+                transition: all 0.15s ease;
               }
-              .option-btn:hover:not(:disabled) {
-                background: rgba(59, 130, 246, 0.2);
-                border-color: var(--primary);
-              }
-              .option-btn.correct {
-                background: rgba(16, 185, 129, 0.25) !important;
-                border-color: var(--accent-green) !important;
-                color: #34d399 !important;
-              }
-              .option-btn.wrong {
-                background: rgba(239, 68, 68, 0.25) !important;
-                border-color: var(--accent-red) !important;
-                color: #f87171 !important;
-              }
-              .option-btn.hidden {
-                visibility: hidden;
-                pointer-events: none;
+              .mode-card:active { transform: translateY(4px); box-shadow: 0 2px 0 #E0A800; }
+              .mode-card.completed {
+                border-color: #69F0AE;
+                box-shadow: 0 6px 0 #00A352, 0 10px 18px rgba(0, 230, 118, 0.25);
+                background: linear-gradient(160deg, #F1F8E9 0%, #E8F5E9 100%);
               }
 
-              .scramble-slots {
+              .badge-icon {
+                width: 52px;
+                height: 52px;
+                border-radius: 50%;
+                background: linear-gradient(180deg, #FFFFFF 0%, #FFE082 100%);
+                border: 3px solid #FFD700;
+                box-shadow: inset 0 2px 4px rgba(255, 255, 255, 0.8), 0 4px 8px rgba(0, 0, 0, 0.15);
                 display: flex;
+                align-items: center;
                 justify-content: center;
-                gap: 8px;
-                margin-bottom: 20px;
-                direction: rtl;
+                font-size: 26px;
+                margin-bottom: 8px;
               }
-              .scramble-slot {
+
+              .mode-name { font-size: 15px; font-weight: 800; color: #3E2723; }
+              .mode-desc { font-size: 11px; font-weight: 600; color: #795548; margin-bottom: 8px; }
+              .mode-tag {
+                font-size: 11px;
+                font-weight: 800;
+                padding: 4px 10px;
+                border-radius: 20px;
+                color: #FFFFFF;
+                background: linear-gradient(180deg, #FFB300, #FB8C00);
+                box-shadow: 0 2px 0 #E65100;
+              }
+              .mode-card.completed .mode-tag {
+                background: linear-gradient(180deg, #00E676, #00C853);
+                box-shadow: 0 2px 0 #007E33;
+              }
+
+              .challenge-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+              .challenge-box {
+                background: rgba(255, 255, 255, 0.95);
+                border-radius: 24px;
+                border: 3px solid #FFE082;
+                padding: 20px 16px;
+                box-shadow: 0 8px 0 #E0A800, 0 14px 25px rgba(0, 0, 0, 0.2);
+                margin-bottom: 18px;
+                text-align: center;
+              }
+              .challenge-q-title { font-size: 14px; font-weight: 800; color: #FB8C00; margin-bottom: 6px; }
+              .challenge-question { font-size: 20px; font-weight: 900; color: #3E2723; line-height: 1.45; }
+
+              /* Mode 1: Hexagonal Word Tiles */
+              .word-slots { display: flex; justify-content: center; gap: 8px; flex-wrap: wrap; margin: 16px 0; min-height: 52px; }
+              .letter-slot {
                 width: 44px;
                 height: 48px;
-                border: 2px dashed rgba(255, 255, 255, 0.3);
-                border-radius: 10px;
+                border-radius: 12px;
+                background: #FFF8E1;
+                border: 2px dashed #FFA000;
                 display: flex;
                 align-items: center;
                 justify-content: center;
-                font-size: 1.3rem;
+                font-size: 22px;
                 font-weight: 800;
-                background: rgba(255, 255, 255, 0.04);
-                color: var(--accent-gold);
-              }
-              .scramble-slot.filled {
-                border-style: solid;
-                border-color: var(--primary);
-                background: rgba(59, 130, 246, 0.15);
-              }
-              .scramble-keyboard {
-                display: flex;
-                flex-wrap: wrap;
-                justify-content: center;
-                gap: 8px;
-                margin-bottom: 16px;
-              }
-              .letter-btn {
-                width: 44px;
-                height: 46px;
-                background: rgba(255, 255, 255, 0.1);
-                border: 1px solid var(--card-border);
-                border-radius: 10px;
-                color: var(--text);
-                font-size: 1.25rem;
-                font-weight: 700;
+                color: #E65100;
                 cursor: pointer;
+              }
+              .letter-slot.filled {
+                border: 2px solid #FF8F00;
+                background: linear-gradient(180deg, #FFFDE7, #FFF59D);
+                box-shadow: 0 3px 0 #E65100;
+              }
+              .hex-keyboard { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; max-width: 320px; margin: 0 auto 16px; }
+              .hex-tile {
+                width: 54px;
+                height: 58px;
+                background: linear-gradient(180deg, #FFE082 0%, #FFA000 65%, #FF8F00 100%);
+                clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
                 display: flex;
                 align-items: center;
                 justify-content: center;
-              }
-              .letter-btn:active { transform: scale(0.9); }
-              .letter-btn.used {
-                opacity: 0.3;
-                pointer-events: none;
-              }
-              .scramble-controls {
-                display: flex;
-                justify-content: center;
-                gap: 12px;
-                margin-bottom: 14px;
-              }
-              .action-sub-btn {
-                background: rgba(255, 255, 255, 0.08);
-                border: 1px solid var(--card-border);
-                color: var(--text);
-                padding: 8px 16px;
-                border-radius: 10px;
-                font-size: 0.9rem;
-                font-weight: 600;
+                font-size: 22px;
+                font-weight: 900;
+                color: #3E1B00;
                 cursor: pointer;
+                filter: drop-shadow(0 5px 0 #C66900);
+                transition: all 0.12s ease;
               }
+              .hex-tile:active { transform: translateY(3px); filter: drop-shadow(0 2px 0 #C66900); }
+              .hex-tile.disabled { opacity: 0.25; pointer-events: none; filter: grayscale(1); }
 
-              .timer-container {
+              /* Mode 2: Memory Grid */
+              .memory-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; max-width: 330px; margin: 10px auto; }
+              .mem-card { width: 68px; height: 68px; perspective: 800px; cursor: pointer; }
+              .mem-inner { width: 100%; height: 100%; position: relative; transform-style: preserve-3d; transition: transform 0.35s ease; border-radius: 16px; }
+              .mem-card.flipped .mem-inner { transform: rotateY(180deg); }
+              .mem-front, .mem-back {
+                position: absolute;
                 width: 100%;
-                height: 10px;
-                background: rgba(255, 255, 255, 0.1);
-                border-radius: 5px;
-                overflow: hidden;
-                margin-bottom: 16px;
-              }
-              .timer-fill {
                 height: 100%;
-                background: linear-gradient(90deg, var(--accent-red), var(--accent-gold), var(--accent-green));
+                backface-visibility: hidden;
+                border-radius: 16px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                font-size: 28px;
+              }
+              .mem-back {
+                background: linear-gradient(135deg, #FFB300 0%, #FF6F00 100%);
+                border: 2px solid #FFF8E1;
+                box-shadow: 0 5px 0 #BF360C, 0 6px 12px rgba(0,0,0,0.15);
+                color: #FFF;
+                font-weight: 900;
+              }
+              .mem-front {
+                background: #FFFFFF;
+                border: 3px solid #69F0AE;
+                box-shadow: 0 5px 0 #00A352;
+                transform: rotateY(180deg);
+              }
+
+              /* Mode 3, 5, 6: Multiple Choice Options */
+              .options-grid { display: flex; flex-direction: column; gap: 10px; width: 100%; }
+              .option-btn {
                 width: 100%;
-                transition: width 1s linear;
-              }
-              .tf-buttons-row {
-                display: grid;
-                grid-template-columns: 1fr 1fr;
-                gap: 14px;
-                margin-bottom: 16px;
-              }
-              .tf-btn {
-                padding: 16px;
-                border-radius: 14px;
-                font-size: 1.2rem;
+                padding: 14px 18px;
+                border-radius: 18px;
+                border: 2px solid #FFE082;
+                background: linear-gradient(180deg, #FFFFFF 0%, #FFF8E1 100%);
+                box-shadow: 0 5px 0 #E0A800, 0 8px 14px rgba(0, 0, 0, 0.12);
+                font-size: 18px;
                 font-weight: 800;
+                color: #3E2723;
+                text-align: right;
                 cursor: pointer;
-                border: none;
                 display: flex;
                 align-items: center;
-                justify-content: center;
-                gap: 8px;
-              }
-              .tf-btn:active { transform: scale(0.95); }
-              .tf-true {
-                background: linear-gradient(135deg, #10b981, #059669);
-                color: white;
-              }
-              .tf-false {
-                background: linear-gradient(135deg, #ef4444, #dc2626);
-                color: white;
-              }
-
-              .connection-words-grid {
-                display: grid;
-                grid-template-columns: 1fr 1fr;
-                gap: 10px;
-                margin-bottom: 18px;
-              }
-              .connection-word-box {
-                background: rgba(139, 92, 246, 0.15);
-                border: 1px solid rgba(139, 92, 246, 0.4);
-                padding: 12px;
-                border-radius: 12px;
-                text-align: center;
-                font-size: 1.1rem;
-                font-weight: 700;
-                color: #c4b5fd;
-              }
-
-              .memory-grid {
-                display: grid;
-                grid-template-columns: repeat(3, 1fr);
-                gap: 10px;
-                margin-bottom: 16px;
-              }
-              .memory-tile {
-                aspect-ratio: 1;
-                background: rgba(255, 255, 255, 0.08);
-                border: 2px solid var(--card-border);
-                border-radius: 12px;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                font-size: 1rem;
-                font-weight: 700;
-                cursor: pointer;
-                text-align: center;
-                padding: 6px;
-                transition: transform 0.3s, background 0.3s;
-              }
-              .memory-tile.revealed {
-                background: rgba(59, 130, 246, 0.3);
-                border-color: var(--primary);
-              }
-              .memory-tile.matched {
-                background: rgba(16, 185, 129, 0.3);
-                border-color: var(--accent-green);
-                color: #34d399;
-                pointer-events: none;
-              }
-
-              .puzzle-bottom-bar {
-                display: flex;
                 justify-content: space-between;
-                align-items: center;
-                margin-top: 14px;
-                padding-top: 12px;
-                border-top: 1px solid var(--card-border);
+                transition: all 0.12s ease;
               }
-              .hint-trigger-btn {
-                background: rgba(245, 158, 11, 0.15);
-                border: 1px solid rgba(245, 158, 11, 0.4);
-                color: var(--accent-gold);
-                padding: 8px 14px;
-                border-radius: 10px;
-                font-weight: 700;
-                font-size: 0.9rem;
-                cursor: pointer;
-                display: flex;
-                align-items: center;
-                gap: 6px;
-              }
+              .option-btn:active { transform: translateY(3px); box-shadow: 0 2px 0 #E0A800; }
+              .option-btn.correct { background: linear-gradient(180deg, #E8F5E9, #C8E6C9); border-color: #00E676; box-shadow: 0 5px 0 #007E33; color: #1B5E20; }
+              .option-btn.wrong { background: linear-gradient(180deg, #FFEBEE, #FFCDD2); border-color: #FF5252; box-shadow: 0 5px 0 #B71C1C; color: #B71C1C; }
 
-              .feedback-box {
-                margin-top: 14px;
-                padding: 12px;
-                border-radius: 12px;
-                font-size: 0.92rem;
-                line-height: 1.4;
-                display: none;
-              }
-              .feedback-box.correct {
-                display: block;
-                background: rgba(16, 185, 129, 0.15);
-                border: 1px solid rgba(16, 185, 129, 0.4);
-                color: #34d399;
-              }
-              .feedback-box.wrong {
-                display: block;
-                background: rgba(239, 68, 68, 0.15);
-                border: 1px solid rgba(239, 68, 68, 0.4);
-                color: #f87171;
-              }
-
-              .setting-item {
-                display: flex;
-                justify-content: space-between;
-                align-items: center;
-                padding: 12px 0;
-                border-bottom: 1px solid var(--card-border);
-              }
-              .setting-info-title { font-weight: 700; font-size: 0.95rem; }
-              .setting-info-desc { font-size: 0.78rem; color: var(--text-muted); }
-
-              .switch {
-                position: relative;
-                display: inline-block;
-                width: 48px;
-                height: 26px;
-              }
-              .switch input { opacity: 0; width: 0; height: 0; }
-              .slider {
-                position: absolute;
-                cursor: pointer;
-                top: 0; left: 0; right: 0; bottom: 0;
-                background-color: rgba(255, 255, 255, 0.2);
-                transition: .3s;
-                border-radius: 26px;
-              }
-              .slider:before {
-                position: absolute;
-                content: "";
-                height: 20px;
-                width: 20px;
-                left: 3px;
-                bottom: 3px;
-                background-color: white;
-                transition: .3s;
+              /* Mode 4: Observation Grid */
+              .obs-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; max-width: 320px; margin: 10px auto; }
+              .obs-item {
+                width: 65px;
+                height: 65px;
                 border-radius: 50%;
-              }
-              input:checked + .slider { background-color: var(--accent-green); }
-              input:checked + .slider:before { transform: translateX(22px); }
-
-              .btn-block {
-                width: 100%;
-                background: linear-gradient(135deg, var(--primary), var(--primary-hover));
-                color: white;
-                border: none;
-                padding: 14px;
-                border-radius: 12px;
-                font-size: 1rem;
-                font-weight: 700;
+                background: linear-gradient(180deg, #FFFFFF 0%, #FFF8E1 100%);
+                border: 3px solid #FFD54F;
+                box-shadow: 0 4px 0 #E0A800, 0 6px 12px rgba(0,0,0,0.1);
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                font-size: 30px;
                 cursor: pointer;
-                margin-top: 10px;
+                transition: transform 0.1s ease;
               }
-              .btn-block:active { transform: scale(0.98); }
-              .btn-block.danger { background: linear-gradient(135deg, #ef4444, #b91c1c); }
-              .btn-block.gold {
-                background: linear-gradient(135deg, var(--accent-gold), #d97706);
-                color: #000;
+              .obs-item:active { transform: scale(0.92); }
+
+              /* Modals & Overlays */
+              .modal-overlay {
+                position: absolute;
+                top: 0; left: 0; right: 0; bottom: 0;
+                background: rgba(0, 0, 0, 0.65);
+                backdrop-filter: blur(8px);
+                z-index: 50;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                padding: 20px;
+                animation: fadeIn 0.2s ease;
+              }
+              .modal-card {
+                width: 100%;
+                max-width: 380px;
+                background: linear-gradient(180deg, #FFFDE7 0%, #FFF8E1 50%, #FFE082 100%);
+                border-radius: 28px;
+                border: 4px solid #FFD700;
+                box-shadow: 0 12px 0 #B28900, 0 20px 40px rgba(0, 0, 0, 0.4);
+                padding: 24px 20px;
+                text-align: center;
+              }
+              .modal-header-icon {
+                width: 76px;
+                height: 76px;
+                border-radius: 50%;
+                background: linear-gradient(180deg, #FFFFFF 0%, #FFE082 100%);
+                border: 4px solid #FFD700;
+                box-shadow: 0 6px 0 #B28900, 0 10px 20px rgba(0,0,0,0.2);
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                font-size: 38px;
+                margin: -50px auto 14px;
+              }
+              .modal-title { font-size: 24px; font-weight: 900; color: #3E1B00; margin-bottom: 8px; }
+              .modal-body { font-size: 15px; font-weight: 700; color: #5D4037; line-height: 1.6; margin-bottom: 20px; }
+
+              .setting-row {
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                padding: 10px 0;
+                border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+                font-size: 16px;
+                font-weight: 800;
+                color: #4E342E;
+              }
+              .switch-btn {
+                width: 54px;
+                height: 30px;
+                background: #BDBDBD;
+                border-radius: 30px;
+                position: relative;
+                cursor: pointer;
+                transition: background 0.25s ease;
+              }
+              .switch-btn.on { background: #00E676; }
+              .switch-thumb {
+                width: 24px;
+                height: 24px;
+                background: #FFFFFF;
+                border-radius: 50%;
+                position: absolute;
+                top: 3px;
+                right: 3px;
+                transition: transform 0.25s ease;
+                box-shadow: 0 2px 5px rgba(0,0,0,0.25);
+              }
+              .switch-btn.on .switch-thumb { transform: translateX(-24px); }
+
+              #confetti-canvas {
+                position: absolute;
+                top: 0; left: 0; width: 100%; height: 100%;
+                pointer-events: none;
+                z-index: 100;
               }
 
-              .about-card { text-align: center; padding: 10px; }
-              .about-avatar { font-size: 3.5rem; margin-bottom: 8px; }
-              .about-author { font-size: 1.3rem; font-weight: 800; color: var(--accent-gold); margin-bottom: 4px; }
-              .about-role { font-size: 0.95rem; color: #60a5fa; margin-bottom: 14px; font-weight: 600; }
-              .about-text { font-size: 0.92rem; color: var(--text-muted); line-height: 1.6; margin-bottom: 16px; }
+              .stages-map { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-top: 10px; }
+              .stage-badge-node {
+                height: 94px;
+                border-radius: 20px;
+                background: linear-gradient(180deg, #FFFFFF 0%, #FFF3E0 100%);
+                border: 3px solid #FFE082;
+                box-shadow: 0 6px 0 #D7A100, 0 10px 18px rgba(0,0,0,0.12);
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                justify-content: center;
+                cursor: pointer;
+                transition: all 0.15s ease;
+              }
+              .stage-badge-node:active { transform: translateY(4px); box-shadow: 0 2px 0 #D7A100; }
+              .stage-badge-node.locked {
+                background: #ECEFF1;
+                border-color: #CFD8DC;
+                box-shadow: 0 6px 0 #90A4AE;
+                filter: grayscale(0.85);
+                cursor: not-allowed;
+              }
+              .stage-num { font-size: 22px; font-weight: 900; color: #3E2723; }
+              .stage-stars { font-size: 13px; color: #FFA000; }
             </style>
           </head>
           <body>
+            <div id="app-container">
+              <canvas id="confetti-canvas"></canvas>
 
-            <header>
-              <div class="header-logo">
-                <span>🧩</span>
-                <span>عالم الألغاز</span>
-              </div>
-              <div class="header-actions">
-                <div class="coins-badge">
-                  <span>🪙</span>
-                  <span id="coinsAmount">150</span>
+              <header>
+                <div style="display: flex; gap: 8px;">
+                  <button id="btn-back" class="icon-btn" onclick="Game.goBack()">↩️</button>
+                  <button id="btn-settings" class="icon-btn" onclick="Game.openSettings()">⚙️</button>
                 </div>
-                <button class="icon-btn gift-ready" id="dailyRewardBtn" title="المكافأة اليومية">🎁</button>
-                <button class="icon-btn" id="settingsBtn" title="الإعدادات">⚙️</button>
-              </div>
-            </header>
-
-            <main id="appContainer"></main>
-
-            <!-- Gameplay Modal -->
-            <div class="modal-overlay" id="puzzleModal">
-              <div class="modal-box">
-                <div class="modal-header">
-                  <div class="modal-title">
-                    <span>🧠</span>
-                    <span id="puzzleModalName">عنوان اللغز</span>
+                <div style="display: flex; gap: 8px;">
+                  <div class="badge-pill coin">
+                    <span style="font-size: 18px;">🪙</span>
+                    <span id="player-coins">300</span>
                   </div>
-                  <button class="close-modal-btn" id="closePuzzleBtn">✕</button>
-                </div>
-                <div id="puzzlePlayArea"></div>
-                <div class="feedback-box" id="feedbackBox"></div>
-                <div class="puzzle-bottom-bar">
-                  <button class="hint-trigger-btn" id="openHintBtn">
-                    <span>💡</span>
-                    <span>وسائل المساعدة</span>
-                  </button>
-                  <span id="puzzlePointsTag" style="font-size: 0.85rem; color: var(--accent-gold); font-weight:700;">+20 نقطة عند الحل</span>
-                </div>
-              </div>
-            </div>
-
-            <!-- Hint Modal -->
-            <div class="modal-overlay" id="hintModal">
-              <div class="modal-box">
-                <div class="modal-header">
-                  <div class="modal-title">
-                    <span>💡</span>
-                    <span>المساعدات الذكية</span>
-                  </div>
-                  <button class="close-modal-btn" id="closeHintBtn">✕</button>
-                </div>
-                <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 14px;">استخدم رصيد نقاطك لتسهيل أو تخطي اللغز:</p>
-                <div id="hintOptionsList" style="display:flex; flex-direction:column; gap:10px;"></div>
-              </div>
-            </div>
-
-            <!-- Settings Modal -->
-            <div class="modal-overlay" id="settingsModal">
-              <div class="modal-box">
-                <div class="modal-header">
-                  <div class="modal-title">
-                    <span>⚙️</span>
-                    <span>إعدادات اللعبة</span>
-                  </div>
-                  <button class="close-modal-btn" id="closeSettingsBtn">✕</button>
-                </div>
-
-                <div class="setting-item">
-                  <div>
-                    <div class="setting-info-title">المؤثرات الصوتية</div>
-                    <div class="setting-info-desc">أصوات التفاعل والنصر والإجابات</div>
-                  </div>
-                  <div class="setting-control">
-                    <label class="switch">
-                      <input type="checkbox" id="soundToggle" checked>
-                      <span class="slider"></span>
-                    </label>
+                  <div class="badge-pill">
+                    <span style="font-size: 18px;">⭐</span>
+                    <span id="player-stars">0</span>
                   </div>
                 </div>
+              </header>
 
-                <div class="setting-item">
-                  <div>
-                    <div class="setting-info-title">الاهتزاز اللمسي</div>
-                    <div class="setting-info-desc">استجابة لمسية عند الضغط والأخطاء</div>
-                  </div>
-                  <div class="setting-control">
-                    <label class="switch">
-                      <input type="checkbox" id="vibrateToggle" checked>
-                      <span class="slider"></span>
-                    </label>
-                  </div>
+              <!-- SCREEN 1: MAP -->
+              <div id="screen-map" class="screen">
+                <div class="stage-hero">
+                  <h1 class="stage-title">تحدي العقول</h1>
+                  <p class="stage-subtitle">ألغاز عربية تجمع المتعة، الذكاء والمعرفة</p>
                 </div>
 
-                <div class="setting-item">
-                  <div>
-                    <div class="setting-info-title">الوضع الليلي / المشرق</div>
-                    <div class="setting-info-desc">تبديل مظهر وتنسيق الألوان</div>
+                <div class="clay-card">
+                  <div style="font-weight: 800; font-size: 16px; margin-bottom: 6px; color: #FFFFFF;">
+                    🏆 مسار المراحل والتحدي
                   </div>
-                  <div class="setting-control">
-                    <label class="switch">
-                      <input type="checkbox" id="themeToggle" checked>
-                      <span class="slider"></span>
-                    </label>
-                  </div>
-                </div>
-
-                <div class="setting-item">
-                  <div>
-                    <div class="setting-info-title">حجم خط الأسئلة</div>
-                    <div class="setting-info-desc">لتسهيل القراءة وتوضيح النصوص</div>
-                  </div>
-                  <div class="setting-control">
-                    <select id="fontSizeSelect" style="background:rgba(255,255,255,0.1); color:var(--text); border:1px solid var(--card-border); padding:6px 10px; border-radius:8px;">
-                      <option value="normal">عادي</option>
-                      <option value="large">كبير</option>
-                      <option value="xlarge">كبير جداً</option>
-                    </select>
-                  </div>
-                </div>
-
-                <!-- About Us Button -->
-                <button class="btn-block gold" id="aboutUsBtn" style="margin-top:18px;">
-                  <span>👨‍💻</span>
-                  <span>من نحن (تصميم وبرمجة: عمار الهلالي)</span>
-                </button>
-
-                <button class="btn-block" id="rulesBtn" style="background:rgba(255,255,255,0.08); border:1px solid var(--card-border);">
-                  <span>📖</span>
-                  <span>قواعد اللعبة وشروط المراحل</span>
-                </button>
-
-                <button class="btn-block danger" id="resetProgressBtn">
-                  <span>🔄</span>
-                  <span>إعادة تعيين التقدم بالكامل</span>
-                </button>
-              </div>
-            </div>
-
-            <!-- About Us Modal -->
-            <div class="modal-overlay" id="aboutModal">
-              <div class="modal-box">
-                <div class="modal-header">
-                  <div class="modal-title">
-                    <span>🌟</span>
-                    <span>من نحن</span>
-                  </div>
-                  <button class="close-modal-btn" id="closeAboutBtn">✕</button>
-                </div>
-                <div class="about-card">
-                  <div class="about-avatar">👨‍💻</div>
-                  <div class="about-author">عمار الهلالي</div>
-                  <div class="about-role">تصميم وبرمجة وتطوير المحتوى</div>
-                  <p class="about-text">
-                    مرحباً بكم في <strong>عالم الألغاز والذكاء</strong>!<br>
-                    تم ابتكار وتطوير وبرمجة هذه اللعبة بواسطة <strong>عمار الهلالي</strong> لتكون منصة فكرية عربية تفاعلية تجمع بين متعة التحدي، إثراء المعلومات العامة، صقل البديهة واللغة، مع الحفاظ على أعلى معايير الجودة والتصميم الراقي.
+                  <p style="font-size: 13px; color: #FFF8E1; line-height: 1.4;">
+                    كل مرحلة تتضمن 6 بطاقات بأساليب ذكاء مختلفة. يلزمك حل 5 بطاقات على الأقل لاجتياز المرحلة وفتح التالية!
                   </p>
-                  <div style="background:rgba(255,255,255,0.05); padding:10px; border-radius:10px; font-size:0.85rem; color:var(--accent-gold);">
-                    الإصدار: v1.0.0 • جميع الحقوق محفوظة © 2025
-                  </div>
                 </div>
-              </div>
-            </div>
 
-            <!-- Rules Modal -->
-            <div class="modal-overlay" id="rulesModal">
-              <div class="modal-box">
-                <div class="modal-header">
-                  <div class="modal-title">
-                    <span>📖</span>
-                    <span>دليل وقواعد اللعبة</span>
+                <div class="stages-map" id="stages-map-container"></div>
+              </div>
+
+              <!-- SCREEN 2: STAGE HUB -->
+              <div id="screen-stage-hub" class="screen hidden">
+                <div class="stage-hero">
+                  <h2 class="stage-title" id="hub-stage-title">المرحلة 1</h2>
+                  <p class="stage-subtitle">أكمل 5 من 6 طرق لفتح المرحلة التالية</p>
+                  
+                  <div class="progress-box">
+                    <div class="prog-step" id="step-0"></div>
+                    <div class="prog-step" id="step-1"></div>
+                    <div class="prog-step" id="step-2"></div>
+                    <div class="prog-step" id="step-3"></div>
+                    <div class="prog-step" id="step-4"></div>
+                    <div class="prog-step" id="step-5"></div>
                   </div>
-                  <button class="close-modal-btn" id="closeRulesBtn">✕</button>
+                  <div class="pass-criteria" id="pass-criteria-text">تم حل 0 من 6 طرق</div>
                 </div>
-                <div style="font-size:0.92rem; line-height:1.6; color:var(--text);">
-                  <p style="margin-bottom:12px;">🌟 <strong>آلية التحدي والتأهل:</strong></p>
-                  <ul style="padding-right:18px; margin-bottom:14px; color:var(--text-muted);">
-                    <li>تحتوي كل مرحلة على <strong>6 بطاقات لألغاز متنوعة بأساليب مختلفة</strong>.</li>
-                    <li><strong>شرط الانتقال:</strong> يجب حل <strong>5 طرق على الأقل</strong> من أصل 6 لتجاوز المرحلة وفتح المرحلة التالية!</li>
-                    <li>حل الطرق الست جميعها يمنحك <strong>وسام الإتقان الكامل</strong> ومكافأة ذهبية خاصة (+50 نقطة).</li>
-                  </ul>
-                  <p style="margin-bottom:12px;">🪙 <strong>نظام النقاط والمساعدات:</strong></p>
-                  <ul style="padding-right:18px; color:var(--text-muted);">
-                    <li>كل إجابة صحيحة تمنحك +20 نقطة.</li>
-                    <li>تتوفر مكافأة يومية مجانية (+50 نقطة) من زر الهدية 🎁.</li>
-                    <li>يمكنك استثمار نقاطك في وسائل المساعدة: كشف حرف، حذف خيارات، أو حل وتخطي اللغز.</li>
-                  </ul>
+
+                <div class="modes-grid" id="modes-grid-container"></div>
+
+                <div style="margin-top: auto;">
+                  <button class="btn-3d btn-green" style="width: 100%;" onclick="Game.checkStagePassedOrNext()">
+                    ✨ اجتياز المرحلة والتالي
+                  </button>
                 </div>
               </div>
+
+              <!-- SCREEN 3: ACTIVE CHALLENGE -->
+              <div id="screen-challenge" class="screen hidden">
+                <div class="challenge-header">
+                  <div class="badge-pill" id="challenge-mode-badge">
+                    <span>🔤</span>
+                    <span id="challenge-mode-name">ثروة لغوية</span>
+                  </div>
+                  <button class="btn-3d btn-orange" style="padding: 6px 14px; font-size: 14px;" onclick="Game.useHint()">
+                    💡 مساعدة (25🪙)
+                  </button>
+                </div>
+
+                <div class="challenge-box">
+                  <div class="challenge-q-title" id="challenge-category">سؤال اللغز</div>
+                  <div class="challenge-question" id="challenge-question-text">نص التحدي</div>
+                </div>
+
+                <!-- Word Hex Mode -->
+                <div id="container-mode-word" class="hidden">
+                  <div class="word-slots" id="word-slots-container"></div>
+                  <div class="hex-keyboard" id="hex-keyboard-container"></div>
+                  <div style="display: flex; justify-content: center; gap: 10px;">
+                    <button class="btn-3d btn-orange" style="padding: 10px 18px; font-size: 15px;" onclick="Game.backspaceWord()">⌫ تراجع</button>
+                    <button class="btn-3d btn-red" style="padding: 10px 18px; font-size: 15px;" onclick="Game.clearWord()">🗑️ مسح</button>
+                  </div>
+                </div>
+
+                <!-- Memory Mode -->
+                <div id="container-mode-memory" class="hidden">
+                  <div style="text-align: center; font-weight: 800; color: #FFF; margin-bottom: 6px;" id="memory-moves-counter">
+                    المطابقات: 0 / 6
+                  </div>
+                  <div class="memory-grid" id="memory-grid-container"></div>
+                </div>
+
+                <!-- Options Mode (Math, Trivia, Riddle) -->
+                <div id="container-mode-options" class="hidden">
+                  <div class="options-grid" id="options-grid-container"></div>
+                </div>
+
+                <!-- Observation Mode -->
+                <div id="container-mode-obs" class="hidden">
+                  <div style="text-align: center; font-weight: 800; color: #FFF; margin-bottom: 6px;">
+                    انقر على الرمز المختلف بسرعة!
+                  </div>
+                  <div class="obs-grid" id="obs-grid-container"></div>
+                </div>
+              </div>
+
+              <!-- MODAL: VICTORY -->
+              <div id="modal-victory" class="modal-overlay hidden">
+                <div class="modal-card">
+                  <div class="modal-header-icon">🏆</div>
+                  <h2 class="modal-title">تهانينا! أحسنت!</h2>
+                  <div class="modal-body" id="victory-modal-desc">
+                    لقد اجتزت بنجاح متطلبات المرحلة بحل الطرق المتنوعة!
+                  </div>
+                  <div style="font-size: 32px; margin-bottom: 16px;" id="victory-stars-display">⭐⭐⭐</div>
+                  <div style="display: flex; flex-direction: column; gap: 10px;">
+                    <button class="btn-3d btn-green" onclick="Game.goToNextStageFromModal()">المرحلة التالية ⏩</button>
+                    <button class="btn-3d btn-blue" onclick="Game.closeModal('modal-victory'); Game.showStageHub(Game.currentStageIndex);">البقاء في المرحلة</button>
+                  </div>
+                </div>
+              </div>
+
+              <!-- MODAL: SETTINGS -->
+              <div id="modal-settings" class="modal-overlay hidden">
+                <div class="modal-card">
+                  <div class="modal-header-icon">⚙️</div>
+                  <h2 class="modal-title">إعدادات اللعبة</h2>
+                  
+                  <div style="margin-bottom: 16px;">
+                    <div class="setting-row">
+                      <span>🔊 المؤثرات الصوتية</span>
+                      <div class="switch-btn on" id="toggle-sound" onclick="Game.toggleSetting('sound')">
+                        <div class="switch-thumb"></div>
+                      </div>
+                    </div>
+                    <div class="setting-row">
+                      <span>📳 الاهتزاز والتفاعل اللمسي</span>
+                      <div class="switch-btn on" id="toggle-vibe" onclick="Game.toggleSetting('vibe')">
+                        <div class="switch-thumb"></div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div style="display: flex; flex-direction: column; gap: 10px;">
+                    <button class="btn-3d btn-blue" onclick="Game.openRules()">📜 طريقة اللعب وقواعد النجاح</button>
+                    <button class="btn-3d btn-orange" onclick="Game.openAboutUs()">ℹ️ من نحن</button>
+                    <button class="btn-3d btn-red" onclick="Game.confirmResetProgress()">🔄 إعادة ضبط التقدم</button>
+                    <button class="btn-3d btn-green" onclick="Game.closeModal('modal-settings')">إغلاق</button>
+                  </div>
+                </div>
+              </div>
+
+              <!-- MODAL: ABOUT US -->
+              <div id="modal-about" class="modal-overlay hidden">
+                <div class="modal-card">
+                  <div class="modal-header-icon">🌟</div>
+                  <h2 class="modal-title">من نحن</h2>
+                  <div class="modal-body" style="text-align: right; font-size: 14px; line-height: 1.7;">
+                    <div style="background: rgba(255, 255, 255, 0.7); padding: 12px; border-radius: 14px; margin-bottom: 10px; border: 1px solid #FFD54F;">
+                      <p style="font-size: 16px; font-weight: 900; color: #E65100; margin-bottom: 4px;">
+                        تحدي العقول - ألغاز عربية
+                      </p>
+                      <p style="font-weight: 800; color: #3E2723;">
+                        🎨 تصميم وبرمجة: <strong>عمار الهلالي</strong>
+                      </p>
+                      <p style="font-size: 12px; color: #795548;">
+                        الإصدار: 1.0.0
+                      </p>
+                    </div>
+                    <p>
+                      لعبة ألغاز وتحدي فكري عربية مبتكرة، صُممت بعناية لتجمع بين المتعة والتشويق واكتساب المعرفة وتنشيط القدرات الذهنية: قوة الذاكرة، الثروة اللغوية، التفكير الحسابي، دقة الملاحظة وسرعة البديهة.
+                    </p>
+                    <p style="margin-top: 8px; font-size: 12px; color: #8D6E63; text-align: center;">
+                      جميع الحقوق محفوظة © 2025
+                    </p>
+                  </div>
+                  <button class="btn-3d btn-orange" onclick="Game.closeModal('modal-about')">حسناً</button>
+                </div>
+              </div>
+
+              <!-- MODAL: RULES -->
+              <div id="modal-rules" class="modal-overlay hidden">
+                <div class="modal-card">
+                  <div class="modal-header-icon">📜</div>
+                  <h2 class="modal-title">طريقة اللعب</h2>
+                  <div class="modal-body" style="text-align: right; font-size: 14px; line-height: 1.6;">
+                    <ul style="padding-right: 18px; margin-bottom: 10px;">
+                      <li>كل مرحلة تحتوي على <strong>6 بطاقات لألغاز متنوعة</strong>.</li>
+                      <li>الأساليب تشمل: ثروة لغوية سداسية، قوة الذاكرة، تفكير حسابي، دقة ملاحظة، ثقافة عامة، وسرعة مرونة التفكير.</li>
+                      <li><strong>شرط الاجتياز:</strong> يجب عليك حل <strong>5 طرق على الأقل</strong> لفتح المرحلة التالية!</li>
+                      <li>حل جميع الطرق الـ 6 يمنحك <strong>3 نجوم كاملة ⭐⭐⭐</strong> ومكافأة ذهبية.</li>
+                    </ul>
+                  </div>
+                  <button class="btn-3d btn-green" onclick="Game.closeModal('modal-rules')">فهمت ذلك!</button>
+                </div>
+              </div>
+
             </div>
 
             <script>
-              const AudioEngine = {
+              const SoundEngine = {
                 ctx: null,
+                enabled: true,
                 init() {
                   if (!this.ctx) {
                     const AudioContext = window.AudioContext || window.webkitAudioContext;
                     if (AudioContext) this.ctx = new AudioContext();
                   }
                 },
-                playTone(freq, type = 'sine', duration = 0.1, delay = 0) {
-                  if (!GameState.settings.sound) return;
-                  try {
-                    this.init();
-                    if (!this.ctx) return;
-                    const osc = this.ctx.createOscillator();
-                    const gain = this.ctx.createGain();
-                    osc.type = type;
-                    osc.frequency.setValueAtTime(freq, this.ctx.currentTime + delay);
-                    gain.gain.setValueAtTime(0.2, this.ctx.currentTime + delay);
-                    gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + delay + duration);
-                    osc.connect(gain);
-                    gain.connect(this.ctx.destination);
-                    osc.start(this.ctx.currentTime + delay);
-                    osc.stop(this.ctx.currentTime + delay + duration);
-                  } catch (e) {}
+                playTone(freq, type, duration, delay = 0) {
+                  if (!this.enabled) return;
+                  this.init();
+                  if (!this.ctx) return;
+                  setTimeout(() => {
+                    try {
+                      const osc = this.ctx.createOscillator();
+                      const gain = this.ctx.createGain();
+                      osc.type = type;
+                      osc.frequency.setValueAtTime(freq, this.ctx.currentTime);
+                      gain.gain.setValueAtTime(0.2, this.ctx.currentTime);
+                      gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + duration);
+                      osc.connect(gain);
+                      gain.connect(this.ctx.destination);
+                      osc.start();
+                      osc.stop(this.ctx.currentTime + duration);
+                    } catch(e) {}
+                  }, delay);
                 },
-                click() { this.playTone(600, 'triangle', 0.05); },
+                tap() { this.playTone(550, 'sine', 0.08); },
                 correct() {
-                  this.playTone(523.25, 'sine', 0.1, 0);
-                  this.playTone(659.25, 'sine', 0.1, 0.08);
-                  this.playTone(783.99, 'sine', 0.2, 0.16);
-                  this.playTone(1046.50, 'sine', 0.35, 0.24);
+                  this.playTone(523.25, 'triangle', 0.15, 0);
+                  this.playTone(659.25, 'triangle', 0.15, 120);
+                  this.playTone(783.99, 'triangle', 0.18, 240);
+                  this.playTone(1046.50, 'triangle', 0.25, 360);
                 },
                 wrong() {
-                  this.playTone(250, 'sawtooth', 0.15, 0);
-                  this.playTone(180, 'sawtooth', 0.25, 0.12);
+                  this.playTone(180, 'sawtooth', 0.15, 0);
+                  this.playTone(140, 'sawtooth', 0.2, 120);
                 },
                 victory() {
-                  [523, 659, 783, 1046, 1318].forEach((f, i) => {
-                    this.playTone(f, 'triangle', 0.25, i * 0.1);
-                  });
-                },
-                hint() {
-                  this.playTone(880, 'sine', 0.1, 0);
-                  this.playTone(1174, 'sine', 0.2, 0.1);
+                  const notes = [440, 554, 659, 880, 783, 880];
+                  notes.forEach((n, i) => this.playTone(n, 'triangle', 0.2, i * 140));
                 }
               };
 
-              function triggerVibrate(ms = 40) {
-                if (!GameState.settings.vibration) return;
-                if (window.AndroidBridge && window.AndroidBridge.vibrate) {
-                  try { window.AndroidBridge.vibrate(ms); return; } catch(e){}
-                }
-                if (navigator.vibrate) {
-                  try { navigator.vibrate(ms); } catch(e){}
+              function triggerHaptic(ms = 40) {
+                if (!Game.settings.vibe) return;
+                if (window.AndroidNative && window.AndroidNative.vibrate) {
+                  window.AndroidNative.vibrate(ms);
+                } else if (navigator.vibrate) {
+                  navigator.vibrate(ms);
                 }
               }
 
-              const STAGES_DATA = [
+              function launchConfetti() {
+                const canvas = document.getElementById('confetti-canvas');
+                const ctx = canvas.getContext('2d');
+                canvas.width = window.innerWidth;
+                canvas.height = window.innerHeight;
+                const pieces = [];
+                const colors = ['#FFD700', '#FF5722', '#00E676', '#00D2FF', '#FFFFFF'];
+                for (let i = 0; i < 70; i++) {
+                  pieces.push({
+                    x: Math.random() * canvas.width,
+                    y: Math.random() * canvas.height - canvas.height,
+                    size: Math.random() * 8 + 6,
+                    color: colors[Math.floor(Math.random() * colors.length)],
+                    vx: Math.random() * 4 - 2,
+                    vy: Math.random() * 4 + 3,
+                    rot: Math.random() * 360,
+                    vrot: Math.random() * 8 - 4
+                  });
+                }
+                let frame = 0;
+                function render() {
+                  ctx.clearRect(0, 0, canvas.width, canvas.height);
+                  pieces.forEach(p => {
+                    p.x += p.vx; p.y += p.vy; p.rot += p.vrot;
+                    ctx.save();
+                    ctx.translate(p.x, p.y);
+                    ctx.rotate((p.rot * Math.PI) / 180);
+                    ctx.fillStyle = p.color;
+                    ctx.fillRect(-p.size / 2, -p.size / 2, p.size, p.size);
+                    ctx.restore();
+                  });
+                  frame++;
+                  if (frame < 120) requestAnimationFrame(render);
+                  else ctx.clearRect(0, 0, canvas.width, canvas.height);
+                }
+                render();
+              }
+
+              const GAME_STAGES = [
                 {
                   id: 1,
-                  title: "المرحلة الأولى: واحة الأذكياء",
-                  description: "انطلاقة ممتعة مع أسئلة وألغاز تنشط الذهن وتفتح شهية التحدي.",
-                  icon: "🌟",
-                  puzzles: [
-                    {
-                      way: 1,
-                      title: "سؤال وتحدي",
-                      type: "trivia",
-                      category: "عالم الحيوان",
-                      question: "ما هو أسرع كائن حي على وجه الأرض في الانقضاض الجوي؟",
-                      options: ["صقر الشاهين", "الفهد الصياد", "العقاب الذهبي", "طائر السنونو"],
-                      correct: 0,
-                      hint: "طائر جارح يغطس في الهواء بسرعة تفوق 300 كم/ساعة!",
-                      explanation: "صقر الشاهين يسجل سرعات تتجاوز 320 كم/ساعة عند الانقضاض العمودي."
-                    },
-                    {
-                      way: 2,
-                      title: "الحروف المبعثرة",
-                      type: "scramble",
-                      category: "أصالة وتراث",
-                      question: "حيوان ضربت به العرب المثل في الصبر ويُلقب بسفينة الصحراء:",
-                      letters: ["ج", "م", "ل", "ر", "ك", "ت"],
-                      answer: "جمل",
-                      hint: "أول حرف هو 'ج' ويتكون من ثلاثة أحرف فقط.",
-                      explanation: "الجمل رمز الصبر والتكيف العجيب في بيئتنا الصحراوية."
-                    },
-                    {
-                      way: 3,
-                      title: "حزورة وفزورة",
-                      type: "riddle",
-                      category: "ألغاز ذكاء",
-                      question: "أمشي بلا قدمين، وأطير بلا أجنحة، وأبكي بلا عينين.. فمن أكون؟",
-                      options: ["السحاب", "الريح", "الظل", "النهر"],
-                      correct: 0,
-                      hint: "تجري في السماء وتجلب الغيث والمطر.",
-                      explanation: "السحاب؛ تسوقه الرياح ويهطل منه المطر كالبكاء."
-                    },
-                    {
-                      way: 4,
-                      title: "سرعة البديهة",
-                      type: "speed_tf",
-                      category: "كيمياء وعناصر",
-                      question: "عنصر الزئبق هو المعدن الوحيد الذي يتواجد في حالة سائلة في درجة حرارة الغرفة.",
-                      correct: true,
-                      timeLimit: 15,
-                      hint: "تذكر المعدن الفضي المستخدم في موازين الحرارة القديمة.",
-                      explanation: "صحيح! الزئبق هو المعدن السائل الوحيد في الظروف المعيارية."
-                    },
-                    {
-                      way: 5,
-                      title: "الرابط المشترك",
-                      type: "connection",
-                      category: "جغرافيا عربية",
-                      words: ["النيل", "الفرات", "دجلة", "بردى"],
-                      question: "ما الرابط الجغرافي المشترك الذي يجمع بين هذه الأسماء الأربعة؟",
-                      options: ["أنهار عربية شهيرة", "عواصم تاريخية", "بحار ومحيطات", "جبال شامخة"],
-                      correct: 0,
-                      hint: "مجارٍ مائية عذبة تجري في مصر والعراق وسوريا.",
-                      explanation: "جميعها أنهار عذبة شهيرة تجري في ربوع الوطن العربي."
-                    },
-                    {
-                      way: 6,
-                      title: "مطابقة الذاكرة",
-                      type: "memory_match",
-                      category: "بلاغة ولغة",
-                      question: "طابق كل كلمة مع مرادفها اللغوي الفصيح في لغة الضاد:",
-                      pairs: [
-                        { id: 1, text: "حُسام", pair: "سيف" },
-                        { id: 2, text: "غيث", pair: "مطر" },
-                        { id: 3, text: "ليث", pair: "أسد" }
-                      ],
-                      hint: "الحسام هو السيف، والغيث هو المطر، والليث هو الأسد."
-                    }
+                  title: "المرحلة الأولى: واحة البدايات",
+                  modes: [
+                    { type: "word", title: "ثروة لغوية", icon: "🔤", desc: "مفردات سداسية", question: "أكبر محيطات الكرة الأرضية مساحة ويغطي أكثر من ثلث كوكبنا:", answer: "الهادئ", tiles: ["ا", "ل", "ه", "ا", "د", "ئ", "م", "ت", "س", "ن", "ر", "ك"] },
+                    { type: "memory", title: "قوة الذاكرة", icon: "🧠", desc: "مطابقة البطاقات", question: "طابق بطاقات الرموز المتماثلة لاختبار حدة ذاكرتك البصرية!", pairs: ["🌙", "🌴", "🕌", "📖", "🐪", "🌟"] },
+                    { type: "math", title: "تفكير حسابي", icon: "🔢", desc: "متتالية ذكية", question: "ما هو الرقم الذي يكمل المتتالية العددية التالية: 2 , 4 , 8 , 16 , [ ؟ ]", options: ["32", "24", "30", "64"], answerIndex: 0 },
+                    { type: "obs", title: "دقة ملاحظة", icon: "👁️", desc: "الرمز المختلف", question: "ابحث عن القمر المكتمل بين الأقمار الأخرى بدقة وسرعة:", items: ["🌔", "🌔", "🌔", "🌕", "🌔", "🌔", "🌔", "🌔", "🌔", "🌔", "🌔", "🌔"], correctIndex: 3 },
+                    { type: "trivia", title: "شتى المجالات", icon: "🌍", desc: "ثقافة ومعرفة", question: "ما هي عاصمة الدولة الأموية في عصر ازدهارها الإسلامي؟", options: ["دمشق", "بغداد", "القاهرة", "قرطبة"], answerIndex: 0 },
+                    { type: "riddle", title: "سرعة ومرونة", icon: "⚡", desc: "حزر فزر", question: "يمشي بلا أرجل، ويبكي بلا أعين، ولا يمكن لمسه فما هو؟", options: ["السحاب", "النهر الجاري", "نسيم الريح", "القلم"], answerIndex: 0 }
                   ]
                 },
                 {
                   id: 2,
-                  title: "المرحلة الثانية: مسالك الفكر",
-                  description: "تحديات ترتقي بمستواك الذهني وتختبر مخزونك المعرفي والثقافي.",
-                  icon: "⚡",
-                  puzzles: [
-                    {
-                      way: 1,
-                      title: "سؤال وتحدي",
-                      type: "trivia",
-                      category: "جغرافيا",
-                      question: "ما هي أكبر جزيرة في البحر الأبيض المتوسط من حيث المساحة؟",
-                      options: ["صقلية", "قبرص", "سردينيا", "كريت"],
-                      correct: 0,
-                      hint: "جزيرة إيطالية عريقة تتميز ببركان إتنا الشهير.",
-                      explanation: "جزيرة صقلية الإيطالية هي أكبر جزر المتوسط بمساحة تقارب 25,711 كم²."
-                    },
-                    {
-                      way: 2,
-                      title: "الحروف المبعثرة",
-                      type: "scramble",
-                      category: "علوم الفلك",
-                      question: "أضخم كواكب المجموعة الشمسية حجماً وكتلة:",
-                      letters: ["م", "ش", "ت", "ر", "ي", "ب", "س"],
-                      answer: "المشتري",
-                      hint: "كوكب غازي عملاق يتميز بقعته الحمراء العظيمة.",
-                      explanation: "كوكب المشتري هو عملاق المجموعة الشمسية بلا منازع."
-                    },
-                    {
-                      way: 3,
-                      title: "حزورة وفزورة",
-                      type: "riddle",
-                      category: "حكمة ومنطق",
-                      question: "شيء كلما أخذت ونقصت منه كبُر، وكلما وضعت فيه صغُر.. فما هو؟",
-                      options: ["الحفرة", "العمر", "الجيب", "البحر"],
-                      correct: 0,
-                      hint: "حفرة في الأرض تزداد اتساعاً كلما أخرجت ترابها.",
-                      explanation: "الحفرة؛ كلما أخذت منها اتسعت، وإذا ردمتها صغرت حتى تزول."
-                    },
-                    {
-                      way: 4,
-                      title: "سرعة البديهة",
-                      type: "speed_tf",
-                      category: "صحة وإنسان",
-                      question: "ينبض قلب الإنسان الطبيعي بمعدل يقارب 100 ألف نبضة خلال اليوم الواحد.",
-                      correct: true,
-                      timeLimit: 15,
-                      hint: "احسب حوالي 70 نبضة بالدقيقة على مدار 24 ساعة.",
-                      explanation: "صحيح! بمعدل 70-75 نبضة في الدقيقة يكون المجموع قرابة 100,000 نبضة يومياً."
-                    },
-                    {
-                      way: 5,
-                      title: "الرابط المشترك",
-                      type: "connection",
-                      category: "عواصم ودول",
-                      words: ["تونس", "الكويت", "الجزائر", "جيبوتي"],
-                      question: "ما هو الرابط الفريد الذي تتطابق فيه هذه الدول الأربع؟",
-                      options: ["اسم العاصمة مطابق لاسم الدولة", "دول غير ساحلية", "تطل على المحيط الهندي", "تقع في نفس القارة"],
-                      correct: 0,
-                      hint: "عاصمة تونس هي تونس، وعاصمة الجزائر هي الجزائر..",
-                      explanation: "في هذه الدول الأربع، اسم العاصمة الرسمية هو ذاته اسم الدولة تماماً."
-                    },
-                    {
-                      way: 6,
-                      title: "مطابقة الذاكرة",
-                      type: "memory_match",
-                      category: "أضداد لغوية",
-                      question: "طابق كل كلمة مع ضدها المعاكس لها تماماً:",
-                      pairs: [
-                        { id: 1, text: "شُجاع", pair: "جبان" },
-                        { id: 2, text: "كريم", pair: "بخيل" },
-                        { id: 3, text: "يقين", pair: "شك" }
-                      ],
-                      hint: "ابحث عن اللفظ ونقيضه المباشر في المعنى."
-                    }
+                  title: "المرحلة الثانية: ينابيع المعرفة",
+                  modes: [
+                    { type: "word", title: "ثروة لغوية", icon: "🔤", desc: "مفردات سداسية", question: "عنصر كيميائي رمزه Fe ويعد من أصلب المعادن وأكثرها نفعاً:", answer: "الحديد", tiles: ["ا", "ل", "ح", "د", "ي", "د", "ن", "ه", "ب", "ف", "س", "ر"] },
+                    { type: "memory", title: "قوة الذاكرة", icon: "🧠", desc: "مطابقة البطاقات", question: "طابق بطاقات الكنوز والجوائز الذهبية في أقل حركات!", pairs: ["💎", "🏆", "🔑", "🛡️", "⚔️", "👑"] },
+                    { type: "math", title: "تفكير حسابي", icon: "🔢", desc: "معادلة ذكية", question: "إذا كانت قيمة ( 7 + س = 15 ) فما هو ناتج ( س × 3 )؟", options: ["24", "18", "21", "28"], answerIndex: 0 },
+                    { type: "obs", title: "دقة ملاحظة", icon: "👁️", desc: "العنصر الفريد", question: "دقق النظر في الساعات، أي منها تعتبر ساعة رملية فريدة؟", items: ["⏰", "⏰", "⏰", "⏰", "⏰", "⏳", "⏰", "⏰", "⏰", "⏰", "⏰", "⏰"], correctIndex: 5 },
+                    { type: "trivia", title: "شتى المجالات", icon: "🌍", desc: "علم الفلك", question: "ما هو أكبر كواكب مجموعتنا الشمسية حجماً على الإطلاق؟", options: ["المشتري", "زحل", "المريخ", "نبتون"], answerIndex: 0 },
+                    { type: "riddle", title: "سرعة ومرونة", icon: "⚡", desc: "لغز مرن", question: "شيء كلما أخذت منه كَبُر، وكلما أضفت إليه صَغُر.. فما هو؟", options: ["الحفرة", "العمر", "الصندوق", "الجبل"], answerIndex: 0 }
                   ]
                 },
                 {
                   id: 3,
-                  title: "المرحلة الثالثة: أسرار البيان",
-                  description: "رحلة في أسرار اللغة والأدب والعلوم لاجتياز عقبات التفكير.",
-                  icon: "💎",
-                  puzzles: [
-                    {
-                      way: 1,
-                      title: "سؤال وتحدي",
-                      type: "trivia",
-                      category: "أدب وشعر",
-                      question: "من هو الشاعر العربي الكبير الملقب بلقب 'شاعر النيل'؟",
-                      options: ["حافظ إبراهيم", "أحمد شوقي", "إبراهيم ناجي", "خليل مطران"],
-                      correct: 0,
-                      hint: "شاعر مصري شهير عاصر أمير الشعراء أحمد شوقي.",
-                      explanation: "حافظ إبراهيم هو شاعر النيل، بينما أحمد شوقي هو أمير الشعراء."
-                    },
-                    {
-                      way: 2,
-                      title: "الحروف المبعثرة",
-                      type: "scramble",
-                      category: "فيزياء وكون",
-                      question: "القوة الكونية الخفية التي تجذب الأجسام نحو مركز الأرض:",
-                      letters: ["ج", "ا", "ذ", "ب", "ي", "ة", "ق", "ل"],
-                      answer: "جاذبية",
-                      hint: "القانون الشهير الذي صاغه العالم إسحاق نيوتن.",
-                      explanation: "الجاذبية الأرضية تحفظ استقرارنا وثبات الغلاف الجوي."
-                    },
-                    {
-                      way: 3,
-                      title: "حزورة وفزورة",
-                      type: "riddle",
-                      category: "ألغاز ذكاء",
-                      question: "يسمعك بلا أذن، ويتكلم معك بلا لسان، فإذا حل الصمت انعدم وجوده.. فمن هو؟",
-                      options: ["صدى الصوت", "الهاتف", "المرآة", "الظل"],
-                      correct: 0,
-                      hint: "ارتداد صوتك في الوديان والمباني الفارغة.",
-                      explanation: "صدى الصوت؛ يكرر ما تقوله ولا يعيش إلا مع حدوث الصوت."
-                    },
-                    {
-                      way: 4,
-                      title: "سرعة البديهة",
-                      type: "speed_tf",
-                      category: "فيزياء",
-                      question: "سرعة الضوء في الفراغ أسرع بكثير من سرعة الصوت في الهواء.",
-                      correct: true,
-                      timeLimit: 15,
-                      hint: "لماذا نرى ضوء البرق قبل سماع صوت الرعد؟",
-                      explanation: "صحيح! سرعة الضوء 300,000 كم/ث بينما الصوت حوالي 343 م/ث فقط."
-                    },
-                    {
-                      way: 5,
-                      title: "الرابط المشترك",
-                      type: "connection",
-                      category: "علماء ورواد",
-                      words: ["ابن الهيثم", "الخوارزمي", "ابن سينا", "جابر بن حيان"],
-                      question: "ما هو الرابط التاريخي الذي يجمع بين هؤلاء الأعلام؟",
-                      options: ["علماء ومؤسسون في الحضارة الإسلامية", "شعراء الجاهلية", "ملوك وقادة عسكريون", "رحالة ومستكشفو قارات"],
-                      correct: 0,
-                      hint: "رواد علم البصريات والجبر والطب والكيمياء.",
-                      explanation: "جميعهم قامات علمية عربية وإسلامية أنارت للعالم دروب العلوم الحديثة."
-                    },
-                    {
-                      way: 6,
-                      title: "مطابقة الذاكرة",
-                      type: "memory_match",
-                      category: "صغار الكائنات",
-                      question: "طابق كل كائن مع اسم صغيره في معاجم اللغة العربية:",
-                      pairs: [
-                        { id: 1, text: "الفرس", pair: "المُهر" },
-                        { id: 2, text: "الأسد", pair: "الشِّبل" },
-                        { id: 3, text: "الناقة", pair: "الحُوار" }
-                      ],
-                      hint: "ابن الفرس مهر، وابن الأسد شبل، وابن الناقة حوار."
-                    }
+                  title: "المرحلة الثالثة: قمم التحدي",
+                  modes: [
+                    { type: "word", title: "ثروة لغوية", icon: "🔤", desc: "مفردات سداسية", question: "صوت ملك الغابة الأسد في لغة الضاد يسمى:", answer: "الزئير", tiles: ["ا", "ل", "ز", "ئ", "ي", "ر", "ص", "ه", "و", "ف", "ن", "ك"] },
+                    { type: "memory", title: "قوة الذاكرة", icon: "🧠", desc: "مطابقة البطاقات", question: "طابق بطاقات الفواكه وتذكر مواضعها بسرعة ودقة!", pairs: ["🍎", "🍇", "🍉", "🍓", "🍌", "🍒"] },
+                    { type: "math", title: "تفكير حسابي", icon: "🔢", desc: "حساب ذهني سريع", question: "ما هو ناتج ( نصف نصف العدد 40 )؟", options: ["10", "5", "20", "15"], answerIndex: 0 },
+                    { type: "obs", title: "دقة ملاحظة", icon: "👁️", desc: "عين الصقر", question: "اختر النجمة المتلألئة المضيئة ذات الإشعاع الفريد:", items: ["⭐", "⭐", "⭐", "⭐", "⭐", "⭐", "⭐", "🌟", "⭐", "⭐", "⭐", "⭐"], correctIndex: 7 },
+                    { type: "trivia", title: "شتى المجالات", icon: "🌍", desc: "جسم الإنسان", question: "كم يبلغ عدد صمامات قلب الإنسان الطبيعي؟", options: ["4 صمامات", "صمامان 2", "3 صمامات", "5 صمامات"], answerIndex: 0 },
+                    { type: "riddle", title: "سرعة ومرونة", icon: "⚡", desc: "ذكاء البديهة", question: "ابن أمك وأبيك، وليس بأختك ولا بأخيك.. فمن يكون؟", options: ["أنت شخصياً", "ابن عمك", "خالك", "جدك"], answerIndex: 0 }
                   ]
                 },
                 {
                   id: 4,
-                  title: "المرحلة الرابعة: دهاليز المعرفة",
-                  description: "مرحلة متقدمة تتطلب ربط الأفكار وقوة الملاحظة الدقيقة.",
-                  icon: "🧠",
-                  puzzles: [
-                    {
-                      way: 1,
-                      title: "سؤال وتحدي",
-                      type: "trivia",
-                      category: "أحياء وإنسان",
-                      question: "ما هو العضو البشري الداخلي القادر على إعادة تجديد أنسجته بعد استئصال جزء منه؟",
-                      options: ["الكبد", "الرئة", "القلب", "البنكرياس"],
-                      correct: 0,
-                      hint: "أكبر غدة في جسم الإنسان وله وظائف تنقية حيوية.",
-                      explanation: "الكبد يمتلك قدرة فريدة على التجدد والنمو مجدداً حتى لو استؤصل ثلثاه."
-                    },
-                    {
-                      way: 2,
-                      title: "الحروف المبعثرة",
-                      type: "scramble",
-                      category: "معالم وآثار",
-                      question: "برج إيطالي تاريخي نال شهرته العالمية بسبب ميلانه الغريب:",
-                      letters: ["ب", "ي", "ز", "ا", "ن", "ف", "ك"],
-                      answer: "بيزا",
-                      hint: "يتكون من أربعة أحرف ويبدأ بحرف الباء.",
-                      explanation: "برج بيزا المائل معلم هندسي ومعماري شهير في إيطاليا."
-                    },
-                    {
-                      way: 3,
-                      title: "حزورة وفزورة",
-                      type: "riddle",
-                      category: "ألغاز شيقة",
-                      question: "له أسنان كثيرة متراصة، ومع ذلك لا يعَض أحداً أبداً.. فما هو؟",
-                      options: ["المشط", "المفتاح", "المنشار", "السحاب"],
-                      correct: 0,
-                      hint: "أداة يومية تستعملها لتهذيب وترتيب شعرك.",
-                      explanation: "المشط؛ يمتلك أسناناً دقيقة لتمشيط الشعر دون أن يعض."
-                    },
-                    {
-                      way: 4,
-                      title: "سرعة البديهة",
-                      type: "speed_tf",
-                      category: "فضاء وجغرافيا",
-                      question: "يمكن رؤية سور الصين العظيم بوضوح بالعين المجردة من سطح القمر دون أدوات تقريب.",
-                      correct: false,
-                      timeLimit: 15,
-                      hint: "أكد رواد الفضاء أنها أسطورة شائعة لا أساس لها علمياً.",
-                      explanation: "خطأ! سور الصين ضيق ومطابق لألوان التضاريس، ولا يمكن رؤيته بالعين المجردة من القمر إطلاقاً."
-                    },
-                    {
-                      way: 5,
-                      title: "الرابط المشترك",
-                      type: "connection",
-                      category: "حواس الإنسان",
-                      words: ["السمع", "البصر", "الشم", "التذوق"],
-                      question: "ما هي الحاسة المتممة لتكتمل الحواس الخمس الأساسية للإنسان؟",
-                      options: ["اللمس", "الاتزان", "الحدس", "الإدراك"],
-                      correct: 0,
-                      hint: "حاسة يستشعر بها الجلد الملمس والحرارة والبرودة.",
-                      explanation: "حاسة اللمس هي الحاسة الخامسة المتممة للحواس الطبيعية الأساسية."
-                    },
-                    {
-                      way: 6,
-                      title: "مطابقة الذاكرة",
-                      type: "memory_match",
-                      category: "عواصم عالمية",
-                      question: "طابق كل دولة مع عاصمتها الشهيرة:",
-                      pairs: [
-                        { id: 1, text: "اليابان", pair: "طوكيو" },
-                        { id: 2, text: "ألمانيا", pair: "برلين" },
-                        { id: 3, text: "فرنسا", pair: "باريس" }
-                      ],
-                      hint: "اليابان مع طوكيو، ألمانيا مع برلين، وفرنسا مع باريس."
-                    }
+                  title: "المرحلة الرابعة: آفاق العباقرة",
+                  modes: [
+                    { type: "word", title: "ثروة لغوية", icon: "🔤", desc: "مفردات سداسية", question: "أطول أنهار الكرة الأرضية ويمر عبر إحدى عشرة دولة في إفريقيا:", answer: "النيل", tiles: ["ا", "ل", "ن", "ي", "ل", "ف", "ر", "ا", "ت", "م", "س", "د"] },
+                    { type: "memory", title: "قوة الذاكرة", icon: "🧠", desc: "مطابقة البطاقات", question: "طابق بطاقات الفضاء الخارجي واستكشف الكواكب والمركبات!", pairs: ["🚀", "🛰️", "🛸", "🌍", "🪐", "☄️"] },
+                    { type: "math", title: "تفكير حسابي", icon: "🔢", desc: "أولويات العمليات", question: "احسب بسرعة ناتج العملية الحسابية: 9 × 8 - 12", options: ["60", "62", "58", "64"], answerIndex: 0 },
+                    { type: "obs", title: "دقة ملاحظة", icon: "👁️", desc: "اختلاف دقيق", question: "أي من هذه الساعات تشير إلى وقت مختلف عن باقي الساعات؟", items: ["🕒", "🕒", "🕒", "🕒", "🕓", "🕒", "🕒", "🕒", "🕒", "🕒", "🕒", "🕒"], correctIndex: 4 },
+                    { type: "trivia", title: "شتى المجالات", icon: "🌍", desc: "تاريخ وبطولة", question: "من هو القائد العربي العظيم الملقب بـ 'سيف الله المسلول'؟", options: ["خالد بن الوليد", "طارق بن زياد", "صلاح الدين الأيوبي", "سعد بن أبي وقاص"], answerIndex: 0 },
+                    { type: "riddle", title: "سرعة ومرونة", icon: "⚡", desc: "لغز محير", question: "له عين واحدة في رأسه ولكنه لا يرى بها شيئاً على الإطلاق.. فما هو؟", options: ["الإبرة", "الإعصار", "الكاميرا", "الباب"], answerIndex: 0 }
                   ]
                 },
                 {
                   id: 5,
-                  title: "المرحلة الخامسة: قمة العباقرة",
-                  description: "المستوى الأقصى لتحدي الذكاء، أثبت أهليتك لتاج البطولة!",
-                  icon: "👑",
-                  puzzles: [
-                    {
-                      way: 1,
-                      title: "سؤال وتحدي",
-                      type: "trivia",
-                      category: "فلك وفضاء",
-                      question: "كم عدد الكواكب الصخرية الداخلية في نظامنا الشمسي؟",
-                      options: ["4 كواكب", "3 كواكب", "5 كواكب", "6 كواكب"],
-                      correct: 0,
-                      hint: "عطارد، الزهرة، الأرض، والمريخ.",
-                      explanation: "الكواكب الصخرية الداخلية هي أربعة كواكب: عطارد، الزهرة، الأرض، والمريخ."
-                    },
-                    {
-                      way: 2,
-                      title: "الحروف المبعثرة",
-                      type: "scramble",
-                      category: "معادن وجواهر",
-                      question: "أصلب مادة طبيعية على الأرض، وهو كربون نقي تبلور تحت ضغط وحرارة مهولة:",
-                      letters: ["ا", "ل", "م", "ا", "س", "ر", "ط"],
-                      answer: "الماس",
-                      hint: "حجر كريم برّاق يُقطع به الزجاج ويزين التيجان.",
-                      explanation: "الماس أنقى وأصلب الجواهر الطبيعية في باطن كوكبنا."
-                    },
-                    {
-                      way: 3,
-                      title: "حزورة وفزورة",
-                      type: "riddle",
-                      category: "ألغاز ذكاء",
-                      question: "ما هو الشيء الذي يحملك في كل خطوة، وتحمله بنفسك أينما ارتحلت؟",
-                      options: ["الحذاء", "الهاتف", "الحقيبة", "الظل"],
-                      correct: 0,
-                      hint: "ترتديه في قدميك وتنقله معك أينما مشيت.",
-                      explanation: "الحذاء؛ تحمله بيديك عند خلعه، ويحمل قدميك عند ارتدائه والسير به."
-                    },
-                    {
-                      way: 4,
-                      title: "سرعة البديهة",
-                      type: "speed_tf",
-                      category: "عجائب المخلوقات",
-                      question: "الحوت الأزرق هو أضخم كائن حي عاش على كوكب الأرض حتى متفوقاً على أكبر الديناصورات.",
-                      correct: true,
-                      timeLimit: 15,
-                      hint: "يصل وزنه إلى ما يقارب 180 طناً وطوله أكثر من 30 متراً.",
-                      explanation: "صحيح! الحوت الأزرق أضخم مخلوق على مر تاريخ الأرض المكتشف علمياً."
-                    },
-                    {
-                      way: 5,
-                      title: "الرابط المشترك",
-                      type: "connection",
-                      category: "تاريخ وعجائب",
-                      words: ["أهرامات الجيزة", "حدائق بابل", "تمثال زيوس", "منارة الإسكندرية"],
-                      question: "ما هو التصنيف التاريخي العظيم الذي يجمع هذه الصروح؟",
-                      options: ["عجائب الدنيا السبع القديمة", "معالم رومانية حربية", "آثار في قارة واحدة فقط", "مبانٍ تعود للعصر الوسيط"],
-                      correct: 0,
-                      hint: "القائمة التاريخية الشهيرة التي جمعها الإغريق قديماً لعجائب البناء.",
-                      explanation: "جميعها صروح تنتمي لقائمة عجائب الدنيا السبع في العالم القديم."
-                    },
-                    {
-                      way: 6,
-                      title: "مطابقة الذاكرة",
-                      type: "memory_match",
-                      category: "مخترعون غيروا العالم",
-                      question: "طابق كل مخترع مع اختراعه الرائد في تاريخ البشرية:",
-                      pairs: [
-                        { id: 1, text: "توماس أديسون", pair: "المصباح" },
-                        { id: 2, text: "جراهام بل", pair: "الهاتف" },
-                        { id: 3, text: "الأخوان رايت", pair: "الطائرة" }
-                      ],
-                      hint: "المصباح لأديسون، الهاتف لجراهام بل، والطيران للأخوين رايت."
-                    }
+                  title: "المرحلة الخامسة: تاج الحكمة",
+                  modes: [
+                    { type: "word", title: "ثروة لغوية", icon: "🔤", desc: "مفردات سداسية", question: "المركبة الصاروخية التي تنقل رواد الفضاء خارج كوكب الأرض:", answer: "الصاروخ", tiles: ["ا", "ل", "ص", "ا", "ر", "و", "خ", "م", "ك", "و", "ك", "ن"] },
+                    { type: "memory", title: "قوة الذاكرة", icon: "🧠", desc: "مطابقة البطاقات", question: "تحدي الذاكرة النهائي: طابق رموز الفنون والموسيقى والألعاب!", pairs: ["🎨", "🎭", "🎪", "🎯", "🎲", "🎸"] },
+                    { type: "math", title: "تفكير حسابي", icon: "🔢", desc: "لغز الأعمار", question: "إذا كان عمر أحمد 12 عاماً وعمر والده 3 أمثاله، فكم عمر الوالد؟", options: ["36 عاماً", "32 عاماً", "40 عاماً", "48 عاماً"], answerIndex: 0 },
+                    { type: "obs", title: "دقة ملاحظة", icon: "👁️", desc: "عين ثاقبة", question: "ابحث عن القلب المكسور بين القلوب الحمراء السليمة:", items: ["❤️", "❤️", "❤️", "❤️", "❤️", "❤️", "❤️", "❤️", "💔", "❤️", "❤️", "❤️"], correctIndex: 8 },
+                    { type: "trivia", title: "شتى المجالات", icon: "🌍", desc: "عالم الحيوان", question: "ما هو أسرع حيوان بري على وجه الأرض عند الركض؟", options: ["الفهد الصياد", "الغزال البري", "الحصان العربي", "الأسد"], answerIndex: 0 },
+                    { type: "riddle", title: "سرعة ومرونة", icon: "⚡", desc: "لغز التفكير المرن", question: "شيء موجود في وسط 'باريس'، وما بين 'السماء' و'الأرض'؟", options: ["حرف الراء", "الهواء النقي", "أشعة الشمس", "الغيوم"], answerIndex: 0 }
                   ]
                 }
               ];
 
-              const GameState = {
-                coins: 150,
-                solved: {},
-                currentStageId: 1,
-                currentPuzzle: null,
-                speedTimerInterval: null,
-                memoryState: { deck: [], revealed: [], matchedIds: [], lock: false },
-                scrambleState: { entered: [], target: '', letters: [] },
-                lastDailyRewardTime: 0,
-                settings: {
-                  sound: true,
-                  vibration: true,
-                  theme: 'dark',
-                  fontSize: 'normal'
-                },
+              const Game = {
+                coins: 300,
+                stars: 0,
+                currentStageIndex: 0,
+                currentModeIndex: 0,
+                currentScreen: "map",
+                progress: {},
+                settings: { sound: true, vibe: true },
+                wordState: { answer: "", entered: [], disabledTileIdxs: [] },
+                memoryState: { flipped: [], matchedCount: 0, locked: false },
 
-                load() {
+                init() {
+                  this.loadStorage();
+                  this.updateHeaderUI();
+                  this.renderStagesMap();
+                },
+                loadStorage() {
                   try {
-                    const raw = localStorage.getItem('ammar_alghaz_save');
-                    if (raw) {
-                      const data = JSON.parse(raw);
-                      if (data.coins !== undefined) this.coins = data.coins;
-                      if (data.solved) this.solved = data.solved;
-                      if (data.lastDailyRewardTime) this.lastDailyRewardTime = data.lastDailyRewardTime;
-                      if (data.settings) this.settings = Object.assign(this.settings, data.settings);
+                    const s = localStorage.getItem("alghaz_ammar_data");
+                    if (s) {
+                      const d = JSON.parse(s);
+                      this.coins = d.coins ?? 300;
+                      this.stars = d.stars ?? 0;
+                      this.progress = d.progress ?? {};
+                      this.settings = d.settings ?? { sound: true, vibe: true };
                     }
                   } catch(e) {}
+                  SoundEngine.enabled = this.settings.sound;
+                  this.syncSettingsToggles();
                 },
-
-                save() {
+                saveStorage() {
                   try {
-                    localStorage.setItem('ammar_alghaz_save', JSON.stringify({
+                    localStorage.setItem("alghaz_ammar_data", JSON.stringify({
                       coins: this.coins,
-                      solved: this.solved,
-                      lastDailyRewardTime: this.lastDailyRewardTime,
+                      stars: this.stars,
+                      progress: this.progress,
                       settings: this.settings
                     }));
                   } catch(e) {}
-                  this.updateHeader();
                 },
-
-                updateHeader() {
-                  document.getElementById('coinsAmount').textContent = this.coins;
-                  const now = Date.now();
-                  const giftBtn = document.getElementById('dailyRewardBtn');
-                  if (now - this.lastDailyRewardTime > 24 * 3600 * 1000) {
-                    giftBtn.classList.add('gift-ready');
-                  } else {
-                    giftBtn.classList.remove('gift-ready');
-                  }
+                updateHeaderUI() {
+                  document.getElementById("player-coins").innerText = this.coins;
+                  document.getElementById("player-stars").innerText = this.stars;
                 },
-
-                isPuzzleSolved(stageId, way) {
-                  return !!this.solved[`${stageId}_${way}`];
+                showScreen(id) {
+                  ["screen-map", "screen-stage-hub", "screen-challenge"].forEach(s => document.getElementById(s).classList.add("hidden"));
+                  document.getElementById(id).classList.remove("hidden");
+                  this.currentScreen = id;
                 },
-
-                getStageSolvedCount(stageId) {
-                  let count = 0;
-                  for (let w = 1; w <= 6; w++) {
-                    if (this.isPuzzleSolved(stageId, w)) count++;
-                  }
-                  return count;
+                goBack() {
+                  SoundEngine.tap();
+                  if (this.currentScreen === "screen-challenge") this.showStageHub(this.currentStageIndex);
+                  else if (this.currentScreen === "screen-stage-hub") { this.renderStagesMap(); this.showScreen("screen-map"); }
                 },
-
-                isStageUnlocked(stageId) {
-                  if (stageId === 1) return true;
-                  return this.getStageSolvedCount(stageId - 1) >= 5;
-                },
-
-                isStagePassed(stageId) {
-                  return this.getStageSolvedCount(stageId) >= 5;
-                },
-
-                isStageMastered(stageId) {
-                  return this.getStageSolvedCount(stageId) === 6;
-                }
-              };
-
-              function renderStagesView() {
-                const container = document.getElementById('appContainer');
-                let html = `
-                  <div class="view-title">اختر مرحلة التحدي</div>
-                  <div class="view-subtitle">أجب على 5 طرق على الأقل في كل مرحلة لفتح المرحلة التالية 🎯</div>
-                  <div class="stages-grid">
-                `;
-
-                STAGES_DATA.forEach(stage => {
-                  const unlocked = GameState.isStageUnlocked(stage.id);
-                  const solvedCount = GameState.getStageSolvedCount(stage.id);
-                  const passed = GameState.isStagePassed(stage.id);
-                  const mastered = GameState.isStageMastered(stage.id);
-
-                  let cardClass = 'stage-card';
-                  let badgeText = '';
-
-                  if (!unlocked) {
-                    cardClass += ' locked';
-                    badgeText = '🔒 مغلقة (أكمل 5 من المرحلة السابقة)';
-                  } else if (mastered) {
-                    cardClass += ' mastered';
-                    badgeText = '👑 إتقان تام (6/6 علامة كاملة)';
-                  } else if (passed) {
-                    cardClass += ' passed';
-                    badgeText = '⭐ تم الاجتياز بنجاح (المرحلة التالية مفتوحة)';
-                  } else {
-                    cardClass += ' unlocked';
-                    badgeText = `🔓 قيد التحدي (${solvedCount} من 6 طرق)`;
-                  }
-
-                  const percent = Math.round((solvedCount / 6) * 100);
-
-                  html += `
-                    <div class="${cardClass}" onclick="openStageDetail(${stage.id})">
-                      <div class="stage-icon">${stage.icon}</div>
-                      <div class="stage-info">
-                        <div class="stage-title">${stage.title}</div>
-                        <div class="stage-desc">${stage.description}</div>
-                        <div class="stage-progress-bar">
-                          <div class="stage-progress-fill" style="width: ${percent}%;"></div>
-                        </div>
-                        <div class="stage-status-text">
-                          <span>${badgeText}</span>
-                          <span>${solvedCount}/6</span>
-                        </div>
-                      </div>
-                    </div>
-                  `;
-                });
-
-                html += `</div>`;
-                container.innerHTML = html;
-              }
-
-              function openStageDetail(stageId) {
-                if (!GameState.isStageUnlocked(stageId)) {
-                  AudioEngine.wrong();
-                  triggerVibrate(60);
-                  alert('هذه المرحلة مغلقة حالياً!\nيجب حل 5 طرق على الأقل في المرحلة السابقة لفتحها.');
-                  return;
-                }
-                AudioEngine.click();
-                triggerVibrate(20);
-                GameState.currentStageId = stageId;
-                renderStageDetailView(stageId);
-              }
-
-              function renderStageDetailView(stageId) {
-                const stage = STAGES_DATA.find(s => s.id === stageId);
-                if (!stage) return;
-
-                const solvedCount = GameState.getStageSolvedCount(stageId);
-                const passed = GameState.isStagePassed(stageId);
-                const mastered = GameState.isStageMastered(stageId);
-                const percent = Math.round((solvedCount / 6) * 100);
-
-                const container = document.getElementById('appContainer');
-                let html = `
-                  <div class="stage-header-box">
-                    <button class="back-btn" onclick="renderStagesView()">
-                      <span>➔</span>
-                      <span>العودة لقائمة المراحل</span>
-                    </button>
-                    <div style="display:flex; align-items:center; gap:8px; margin-top:4px;">
-                      <span style="font-size:1.8rem;">${stage.icon}</span>
-                      <div>
-                        <h2 style="font-size:1.2rem; font-weight:800;">${stage.title}</h2>
-                        <p style="font-size:0.85rem; color:var(--text-muted);">${stage.description}</p>
-                      </div>
-                    </div>
-                    
-                    <div style="margin-top:12px;">
-                      <div class="stage-progress-bar" style="height:8px;">
-                        <div class="stage-progress-fill" style="width: ${percent}%;"></div>
-                      </div>
-                      <div style="display:flex; justify-content:space-between; font-size:0.82rem; margin-top:4px; font-weight:700;">
-                        <span>أنجزت ${solvedCount} من 6 طرق</span>
-                        <span>${mastered ? '👑 علامة كاملة!' : passed ? '⭐ تم اجتياز المرحلة' : 'متبقي ' + (5 - solvedCount) + ' لفتح التالية'}</span>
-                      </div>
-                    </div>
-
-                    <div class="rule-badge">
-                      ${passed ? '🎉 أحسنت! تجاوزت شرط الـ 5 طرق وفُتحت المرحلة التالية' : '📌 شرط النجاح: حل 5 طرق على الأقل للتأهل'}
-                    </div>
-                  </div>
-
-                  <div class="puzzles-grid">
-                `;
-
-                stage.puzzles.forEach(puzzle => {
-                  const isSolved = GameState.isPuzzleSolved(stageId, puzzle.way);
-                  html += `
-                    <div class="puzzle-card ${isSolved ? 'solved' : ''}" onclick="openPuzzle(${stageId}, ${puzzle.way})">
-                      <div>
-                        <div class="puzzle-way-num">الطريقة ${puzzle.way}</div>
-                        <div class="puzzle-card-title">${puzzle.title}</div>
-                        <div class="puzzle-card-cat">${puzzle.category}</div>
-                      </div>
-                      <div class="puzzle-card-status">
-                        ${isSolved ? '<span>✅ تم الحل (+20)</span>' : '<span>⏳ ابدأ التحدي</span>'}
-                      </div>
-                    </div>
-                  `;
-                });
-
-                html += `</div>`;
-                container.innerHTML = html;
-              }
-
-              function openPuzzle(stageId, way) {
-                AudioEngine.click();
-                triggerVibrate(25);
-                const stage = STAGES_DATA.find(s => s.id === stageId);
-                const puzzle = stage.puzzles.find(p => p.way === way);
-                GameState.currentPuzzle = { stageId, puzzle };
-
-                document.getElementById('puzzleModalName').textContent = `${stage.title} • الطريقة ${puzzle.way}: ${puzzle.title}`;
-                const playArea = document.getElementById('puzzlePlayArea');
-                const feedback = document.getElementById('feedbackBox');
-                feedback.style.display = 'none';
-                feedback.className = 'feedback-box';
-
-                const isSolved = GameState.isPuzzleSolved(stageId, way);
-                document.getElementById('puzzlePointsTag').textContent = isSolved ? '✅ اللغز محلول مسبقاً' : '+20 نقطة عند الحل';
-
-                if (puzzle.type === 'trivia' || puzzle.type === 'riddle') {
-                  renderTriviaOrRiddle(puzzle, playArea);
-                } else if (puzzle.type === 'scramble') {
-                  renderScramble(puzzle, playArea);
-                } else if (puzzle.type === 'speed_tf') {
-                  renderSpeedTF(puzzle, playArea);
-                } else if (puzzle.type === 'connection') {
-                  renderConnection(puzzle, playArea);
-                } else if (puzzle.type === 'memory_match') {
-                  renderMemoryMatch(puzzle, playArea);
-                }
-
-                document.getElementById('puzzleModal').classList.add('active');
-              }
-
-              function closePuzzle() {
-                if (GameState.speedTimerInterval) {
-                  clearInterval(GameState.speedTimerInterval);
-                  GameState.speedTimerInterval = null;
-                }
-                document.getElementById('puzzleModal').classList.remove('active');
-                renderStageDetailView(GameState.currentStageId);
-              }
-
-              function awardPuzzleSolved(puzzleObj) {
-                const { stageId, puzzle } = puzzleObj;
-                const key = `${stageId}_${puzzle.way}`;
-                if (!GameState.solved[key]) {
-                  GameState.solved[key] = true;
-                  GameState.coins += 20;
-
-                  const solvedCount = GameState.getStageSolvedCount(stageId);
-                  if (solvedCount === 5) {
-                    GameState.coins += 30;
-                    setTimeout(() => {
-                      AudioEngine.victory();
-                      alert('🎉 تهانينا البالغة!\nلقد حللت 5 طرق بنجاح وتم فتح المرحلة التالية! 🚀\nحصلت على +30 نقطة إضافية مكافأة تأهل!');
-                    }, 600);
-                  } else if (solvedCount === 6) {
-                    GameState.coins += 50;
-                    setTimeout(() => {
-                      AudioEngine.victory();
-                      alert('👑 إنجاز أسطوري وعلامة كاملة!\nلقد حللت جميع الطرق الست في هذه المرحلة ببراعة فائقة!\nحصلت على +50 نقطة إضافية ووسام الإتقان! 🌟');
-                    }, 600);
-                  }
-
-                  GameState.save();
-                }
-              }
-
-              function renderTriviaOrRiddle(puzzle, container) {
-                let html = `<div class="puzzle-question-text">${puzzle.question}</div><div class="options-list">`;
-                puzzle.options.forEach((opt, idx) => {
-                  html += `<button class="option-btn" id="opt_${idx}" onclick="checkOption(${idx})">${opt}</button>`;
-                });
-                html += `</div>`;
-                container.innerHTML = html;
-              }
-
-              window.checkOption = function(idx) {
-                const { puzzle } = GameState.currentPuzzle;
-                const feedback = document.getElementById('feedbackBox');
-                const isCorrect = (idx === puzzle.correct);
-                const btn = document.getElementById(`opt_${idx}`);
-
-                if (isCorrect) {
-                  AudioEngine.correct();
-                  triggerVibrate(50);
-                  btn.classList.add('correct');
-                  feedback.className = 'feedback-box correct';
-                  feedback.innerHTML = `<strong>إجابة صحيحة وممتازة! 🎉</strong><br>${puzzle.explanation || ''}`;
-                  document.querySelectorAll('.option-btn').forEach(b => b.disabled = true);
-                  awardPuzzleSolved(GameState.currentPuzzle);
-                } else {
-                  AudioEngine.wrong();
-                  triggerVibrate(80);
-                  btn.classList.add('wrong');
-                  feedback.className = 'feedback-box wrong';
-                  feedback.innerHTML = `<strong>إجابة غير دقيقة! حاول مجدداً أو استعن بالتلميح 💡</strong>`;
-                }
-              };
-
-              function renderScramble(puzzle, container) {
-                GameState.scrambleState = {
-                  entered: [],
-                  target: puzzle.answer,
-                  letters: [...puzzle.letters].sort(() => Math.random() - 0.5)
-                };
-
-                let html = `
-                  <div class="puzzle-question-text">${puzzle.question}</div>
-                  <div class="scramble-slots" id="scrambleSlots"></div>
-                  <div class="scramble-keyboard" id="scrambleLetters"></div>
-                  <div class="scramble-controls">
-                    <button class="action-sub-btn" onclick="backspaceScramble()">⌫ حذف حرف</button>
-                    <button class="action-sub-btn" onclick="clearScramble()">مسح الكل</button>
-                  </div>
-                `;
-                container.innerHTML = html;
-                updateScrambleUI();
-              }
-
-              function updateScrambleUI() {
-                const { entered, target, letters } = GameState.scrambleState;
-                const slotsContainer = document.getElementById('scrambleSlots');
-                const keysContainer = document.getElementById('scrambleLetters');
-                if (!slotsContainer || !keysContainer) return;
-
-                let slotsHtml = '';
-                for (let i = 0; i < target.length; i++) {
-                  const char = entered[i] || '';
-                  slotsHtml += `<div class="scramble-slot ${char ? 'filled' : ''}">${char}</div>`;
-                }
-                slotsContainer.innerHTML = slotsHtml;
-
-                let keysHtml = '';
-                letters.forEach((ch, idx) => {
-                  let prevCount = 0;
-                  for (let j = 0; j < idx; j++) {
-                    if (letters[j] === ch) prevCount++;
-                  }
-                  const usedCount = entered.filter(c => c === ch).length;
-                  const isUsed = prevCount < usedCount;
-                  keysHtml += `<button class="letter-btn ${isUsed ? 'used' : ''}" onclick="pickScrambleLetter('${ch}')">${ch}</button>`;
-                });
-                keysContainer.innerHTML = keysHtml;
-
-                if (entered.length === target.length) {
-                  const result = entered.join('');
-                  const feedback = document.getElementById('feedbackBox');
-                  if (result === target) {
-                    AudioEngine.correct();
-                    triggerVibrate(60);
-                    feedback.className = 'feedback-box correct';
-                    feedback.innerHTML = `<strong>إجابة رائعة وصحيحة! فككت الشفرة بنجاح 🎯</strong><br>${GameState.currentPuzzle.puzzle.explanation || ''}`;
-                    awardPuzzleSolved(GameState.currentPuzzle);
-                  } else {
-                    AudioEngine.wrong();
-                    triggerVibrate(70);
-                    feedback.className = 'feedback-box wrong';
-                    feedback.innerHTML = `<strong>الترتيب غير صحيح! حاول إعادة تنظيم الحروف.</strong>`;
-                  }
-                }
-              }
-
-              window.pickScrambleLetter = function(ch) {
-                if (GameState.scrambleState.entered.length < GameState.scrambleState.target.length) {
-                  AudioEngine.click();
-                  triggerVibrate(15);
-                  GameState.scrambleState.entered.push(ch);
-                  updateScrambleUI();
-                }
-              };
-
-              window.backspaceScramble = function() {
-                if (GameState.scrambleState.entered.length > 0) {
-                  AudioEngine.click();
-                  GameState.scrambleState.entered.pop();
-                  updateScrambleUI();
-                }
-              };
-
-              window.clearScramble = function() {
-                AudioEngine.click();
-                GameState.scrambleState.entered = [];
-                updateScrambleUI();
-              };
-
-              function renderSpeedTF(puzzle, container) {
-                let secondsLeft = puzzle.timeLimit || 15;
-                let html = `
-                  <div class="timer-container">
-                    <div class="timer-fill" id="speedTimerFill"></div>
-                  </div>
-                  <div class="puzzle-question-text" style="font-size:1.1rem;">${puzzle.question}</div>
-                  <div class="tf-buttons-row">
-                    <button class="tf-btn tf-true" onclick="checkTF(true)">✓ صح</button>
-                    <button class="tf-btn tf-false" onclick="checkTF(false)">✗ خطأ</button>
-                  </div>
-                `;
-                container.innerHTML = html;
-
-                const fill = document.getElementById('speedTimerFill');
-                fill.style.width = '100%';
-
-                if (GameState.speedTimerInterval) clearInterval(GameState.speedTimerInterval);
-
-                const startTime = Date.now();
-                const totalMs = secondsLeft * 1000;
-
-                GameState.speedTimerInterval = setInterval(() => {
-                  const elapsed = Date.now() - startTime;
-                  const remaining = Math.max(0, totalMs - elapsed);
-                  const pct = (remaining / totalMs) * 100;
-                  if (fill) fill.style.width = `${pct}%`;
-
-                  if (remaining <= 0) {
-                    clearInterval(GameState.speedTimerInterval);
-                    GameState.speedTimerInterval = null;
-                    AudioEngine.wrong();
-                    triggerVibrate(90);
-                    const feedback = document.getElementById('feedbackBox');
-                    feedback.className = 'feedback-box wrong';
-                    feedback.innerHTML = `<strong>انتهى الوقت المحدد! ⏱️</strong><br><button class="btn-block" style="margin-top:8px;" onclick="openPuzzle(${GameState.currentPuzzle.stageId}, ${GameState.currentPuzzle.puzzle.way})">إعادة المحاولة</button>`;
-                    document.querySelectorAll('.tf-btn').forEach(b => b.disabled = true);
-                  }
-                }, 100);
-              }
-
-              window.checkTF = function(answer) {
-                if (GameState.speedTimerInterval) {
-                  clearInterval(GameState.speedTimerInterval);
-                  GameState.speedTimerInterval = null;
-                }
-                const { puzzle } = GameState.currentPuzzle;
-                const feedback = document.getElementById('feedbackBox');
-                document.querySelectorAll('.tf-btn').forEach(b => b.disabled = true);
-
-                if (answer === puzzle.correct) {
-                  AudioEngine.correct();
-                  triggerVibrate(50);
-                  feedback.className = 'feedback-box correct';
-                  feedback.innerHTML = `<strong>سرعة بديهة مذهلة! إجابة صحيحة ⚡</strong><br>${puzzle.explanation || ''}`;
-                  awardPuzzleSolved(GameState.currentPuzzle);
-                } else {
-                  AudioEngine.wrong();
-                  triggerVibrate(80);
-                  feedback.className = 'feedback-box wrong';
-                  feedback.innerHTML = `<strong>إجابة خاطئة!</strong><br>${puzzle.explanation || ''}<br><button class="btn-block" style="margin-top:8px;" onclick="openPuzzle(${GameState.currentPuzzle.stageId}, ${GameState.currentPuzzle.puzzle.way})">أعد المحاولة</button>`;
-                }
-              };
-
-              function renderConnection(puzzle, container) {
-                let html = `
-                  <div style="font-size:0.9rem; color:var(--text-muted); text-align:center; margin-bottom:8px;">أوجد السر المشترك بين هذه الكلمات الأربع:</div>
-                  <div class="connection-words-grid">
-                `;
-                puzzle.words.forEach(w => {
-                  html += `<div class="connection-word-box">${w}</div>`;
-                });
-                html += `</div>
-                  <div class="puzzle-question-text" style="font-size:1.05rem;">${puzzle.question}</div>
-                  <div class="options-list">
-                `;
-                puzzle.options.forEach((opt, idx) => {
-                  html += `<button class="option-btn" id="opt_${idx}" onclick="checkOption(${idx})">${opt}</button>`;
-                });
-                html += `</div>`;
-                container.innerHTML = html;
-              }
-
-              function renderMemoryMatch(puzzle, container) {
-                let deck = [];
-                puzzle.pairs.forEach(p => {
-                  deck.push({ id: p.id, text: p.text });
-                  deck.push({ id: p.id, text: p.pair });
-                });
-                deck.sort(() => Math.random() - 0.5);
-
-                GameState.memoryState = {
-                  deck: deck,
-                  revealed: [],
-                  matchedIds: [],
-                  lock: false
-                };
-
-                let html = `
-                  <div class="puzzle-question-text" style="font-size:1rem; margin-bottom:12px;">${puzzle.question}</div>
-                  <div class="memory-grid" id="memoryGrid"></div>
-                `;
-                container.innerHTML = html;
-                updateMemoryGridUI();
-              }
-
-              function updateMemoryGridUI() {
-                const grid = document.getElementById('memoryGrid');
-                if (!grid) return;
-                const { deck, revealed, matchedIds } = GameState.memoryState;
-
-                let html = '';
-                deck.forEach((card, idx) => {
-                  const isMatched = matchedIds.includes(card.id);
-                  const isRevealed = isMatched || revealed.includes(idx);
-                  html += `
-                    <div class="memory-tile ${isMatched ? 'matched' : isRevealed ? 'revealed' : ''}" onclick="pickMemoryCard(${idx})">
-                      ${isRevealed ? card.text : '❓'}
-                    </div>
-                  `;
-                });
-                grid.innerHTML = html;
-              }
-
-              window.pickMemoryCard = function(idx) {
-                const st = GameState.memoryState;
-                if (st.lock) return;
-                if (st.revealed.includes(idx)) return;
-                if (st.matchedIds.includes(st.deck[idx].id)) return;
-
-                AudioEngine.click();
-                triggerVibrate(20);
-                st.revealed.push(idx);
-                updateMemoryGridUI();
-
-                if (st.revealed.length === 2) {
-                  st.lock = true;
-                  const [i1, i2] = st.revealed;
-                  const c1 = st.deck[i1];
-                  const c2 = st.deck[i2];
-
-                  if (c1.id === c2.id) {
-                    setTimeout(() => {
-                      AudioEngine.correct();
-                      triggerVibrate(40);
-                      st.matchedIds.push(c1.id);
-                      st.revealed = [];
-                      st.lock = false;
-                      updateMemoryGridUI();
-
-                      if (st.matchedIds.length === 3) {
-                        const feedback = document.getElementById('feedbackBox');
-                        feedback.className = 'feedback-box correct';
-                        feedback.innerHTML = `<strong>مطابقة عبقرية ومثالية! أتممت اللغز بنجاح 🌟</strong>`;
-                        awardPuzzleSolved(GameState.currentPuzzle);
-                      }
-                    }, 350);
-                  } else {
-                    setTimeout(() => {
-                      AudioEngine.wrong();
-                      st.revealed = [];
-                      st.lock = false;
-                      updateMemoryGridUI();
-                    }, 900);
-                  }
-                }
-              };
-
-              function openHintsModal() {
-                AudioEngine.hint();
-                triggerVibrate(20);
-                const list = document.getElementById('hintOptionsList');
-                const { puzzle } = GameState.currentPuzzle;
-
-                let hints = [];
-
-                if (puzzle.type === 'trivia' || puzzle.type === 'connection' || puzzle.type === 'riddle') {
-                  hints.push({
-                    title: 'حذف خيارين غير صحيحين (50:50)',
-                    cost: 15,
-                    action: () => {
-                      if (deductCoins(15)) {
-                        let hidden = 0;
-                        puzzle.options.forEach((_, idx) => {
-                          if (idx !== puzzle.correct && hidden < 2) {
-                            const b = document.getElementById(`opt_${idx}`);
-                            if (b && !b.classList.contains('hidden')) {
-                              b.classList.add('hidden');
-                              hidden++;
-                            }
-                          }
-                        });
-                        closeHintsModal();
-                      }
-                    }
+                renderStagesMap() {
+                  const container = document.getElementById("stages-map-container");
+                  container.innerHTML = "";
+                  let totalStars = 0;
+                  GAME_STAGES.forEach((st, idx) => {
+                    const prog = this.progress[idx] || { solvedModes: [], passed: false, stars: 0 };
+                    totalStars += (prog.stars || 0);
+                    const isUnlocked = idx === 0 || (this.progress[idx - 1] && this.progress[idx - 1].passed);
+                    const node = document.createElement("div");
+                    node.className = `stage-badge-node ${isUnlocked ? "" : "locked"}`;
+                    node.innerHTML = `
+                      <div class="stage-num">${isUnlocked ? (idx + 1) : "🔒"}</div>
+                      <div style="font-size: 11px; font-weight: 800; color: #795548;">المرحلة ${idx + 1}</div>
+                      <div class="stage-stars">${"⭐".repeat(prog.stars || 0)}</div>
+                    `;
+                    if (isUnlocked) node.onclick = () => { SoundEngine.tap(); this.showStageHub(idx); };
+                    container.appendChild(node);
                   });
-                }
-
-                if (puzzle.type === 'scramble') {
-                  hints.push({
-                    title: 'كشف الحرف التالي الصحيح',
-                    cost: 10,
-                    action: () => {
-                      if (deductCoins(10)) {
-                        const currentLen = GameState.scrambleState.entered.length;
-                        if (currentLen < GameState.scrambleState.target.length) {
-                          const nextChar = GameState.scrambleState.target[currentLen];
-                          GameState.scrambleState.entered.push(nextChar);
-                          updateScrambleUI();
-                        }
-                        closeHintsModal();
-                      }
-                    }
+                  this.stars = totalStars;
+                  this.updateHeaderUI();
+                },
+                showStageHub(stageIdx) {
+                  this.currentStageIndex = stageIdx;
+                  const st = GAME_STAGES[stageIdx];
+                  const prog = this.progress[stageIdx] || { solvedModes: [], passed: false, stars: 0 };
+                  document.getElementById("hub-stage-title").innerText = st.title;
+                  document.getElementById("pass-criteria-text").innerText = `تم حل ${prog.solvedModes.length} من 6 طرق (يلزم 5 على الأقل لاجتياز المرحلة)`;
+                  for (let i = 0; i < 6; i++) {
+                    const step = document.getElementById(`step-${i}`);
+                    if (prog.solvedModes.includes(i)) step.classList.add("done");
+                    else step.classList.remove("done");
+                  }
+                  const grid = document.getElementById("modes-grid-container");
+                  grid.innerHTML = "";
+                  st.modes.forEach((m, mIdx) => {
+                    const isDone = prog.solvedModes.includes(mIdx);
+                    const card = document.createElement("div");
+                    card.className = `mode-card ${isDone ? "completed" : ""}`;
+                    card.innerHTML = `
+                      <div class="badge-icon">${m.icon}</div>
+                      <div class="mode-name">${m.title}</div>
+                      <div class="mode-desc">${m.desc}</div>
+                      <div class="mode-tag">${isDone ? "مكتمل ✓" : "ابدأ التحدي"}</div>
+                    `;
+                    card.onclick = () => { SoundEngine.tap(); this.startChallenge(stageIdx, mIdx); };
+                    grid.appendChild(card);
                   });
-                }
-
-                if (puzzle.hint) {
-                  hints.push({
-                    title: 'إظهار تلميح دلالي ذكي',
-                    cost: 10,
-                    action: () => {
-                      if (deductCoins(10)) {
-                        alert(`💡 تلميح خاص:\n${puzzle.hint}`);
-                        closeHintsModal();
-                      }
-                    }
+                  this.showScreen("screen-stage-hub");
+                },
+                startChallenge(stageIdx, modeIdx) {
+                  this.currentStageIndex = stageIdx;
+                  this.currentModeIndex = modeIdx;
+                  const mode = GAME_STAGES[stageIdx].modes[modeIdx];
+                  document.getElementById("challenge-mode-badge").querySelector("span:first-child").innerText = mode.icon;
+                  document.getElementById("challenge-mode-name").innerText = mode.title;
+                  document.getElementById("challenge-category").innerText = mode.desc;
+                  document.getElementById("challenge-question-text").innerText = mode.question;
+                  ["container-mode-word", "container-mode-memory", "container-mode-options", "container-mode-obs"].forEach(id => {
+                    document.getElementById(id).classList.add("hidden");
                   });
-                }
-
-                hints.push({
-                  title: 'حل اللغز وتخطيه مباشرة',
-                  cost: 35,
-                  action: () => {
-                    if (deductCoins(35)) {
-                      awardPuzzleSolved(GameState.currentPuzzle);
-                      const feedback = document.getElementById('feedbackBox');
-                      feedback.className = 'feedback-box correct';
-                      feedback.innerHTML = `<strong>تم تخطي اللغز بنجاح بالاستعانة بالمساعدات! 🎉</strong>`;
-                      closeHintsModal();
+                  if (mode.type === "word") this.setupWordMode(mode);
+                  else if (mode.type === "memory") this.setupMemoryMode(mode);
+                  else if (mode.type === "obs") this.setupObsMode(mode);
+                  else this.setupOptionsMode(mode);
+                  this.showScreen("screen-challenge");
+                },
+                setupWordMode(mode) {
+                  document.getElementById("container-mode-word").classList.remove("hidden");
+                  this.wordState = { answer: mode.answer, entered: [], tiles: [...mode.tiles], disabledTileIdxs: [] };
+                  this.renderWordUI();
+                },
+                renderWordUI() {
+                  const slots = document.getElementById("word-slots-container");
+                  slots.innerHTML = "";
+                  for (let i = 0; i < this.wordState.answer.length; i++) {
+                    const val = this.wordState.entered[i]?.char || "";
+                    const s = document.createElement("div");
+                    s.className = `letter-slot ${val ? "filled" : ""}`;
+                    s.innerText = val;
+                    s.onclick = () => { if (this.wordState.entered[i]) this.removeWordLetterAt(i); };
+                    slots.appendChild(s);
+                  }
+                  const hex = document.getElementById("hex-keyboard-container");
+                  hex.innerHTML = "";
+                  this.wordState.tiles.forEach((char, idx) => {
+                    const isUsed = this.wordState.disabledTileIdxs.includes(idx);
+                    const t = document.createElement("div");
+                    t.className = `hex-tile ${isUsed ? "disabled" : ""}`;
+                    t.innerText = char;
+                    t.onclick = () => { if (!isUsed) this.typeHexLetter(char, idx); };
+                    hex.appendChild(t);
+                  });
+                },
+                typeHexLetter(char, tileIdx) {
+                  if (this.wordState.entered.length >= this.wordState.answer.length) return;
+                  SoundEngine.playTone(600, 'sine', 0.06);
+                  triggerHaptic(30);
+                  this.wordState.entered.push({ char, tileIdx });
+                  this.wordState.disabledTileIdxs.push(tileIdx);
+                  this.renderWordUI();
+                  if (this.wordState.entered.length === this.wordState.answer.length) {
+                    const formed = this.wordState.entered.map(e => e.char).join("");
+                    if (formed === this.wordState.answer) this.handleModeSuccess();
+                    else {
+                      SoundEngine.wrong();
+                      triggerHaptic(120);
+                      setTimeout(() => alert("الإجابة غير صحيحة، حاول مجدداً!"), 100);
                     }
                   }
-                });
-
-                let html = '';
-                hints.forEach((h, i) => {
-                  html += `
-                    <button class="btn-block" style="text-align:right; display:flex; justify-content:space-between; align-items:center;" onclick="window.currentHintActions[${i}]()">
-                      <span>${h.title}</span>
-                      <span style="background:rgba(245,158,11,0.25); color:var(--accent-gold); padding:2px 8px; border-radius:6px;">🪙 ${h.cost}</span>
-                    </button>
-                  `;
-                });
-
-                window.currentHintActions = hints.map(h => h.action);
-                list.innerHTML = html;
-                document.getElementById('hintModal').classList.add('active');
-              }
-
-              function closeHintsModal() {
-                document.getElementById('hintModal').classList.remove('active');
-              }
-
-              function deductCoins(amount) {
-                if (GameState.coins >= amount) {
-                  GameState.coins -= amount;
-                  GameState.save();
-                  AudioEngine.click();
-                  triggerVibrate(25);
-                  return true;
-                } else {
-                  AudioEngine.wrong();
-                  triggerVibrate(70);
-                  alert(`عذراً، رصيدك من النقاط لا يكفي!\nتحتاج ${amount} نقطة، ورصيدك الحالي ${GameState.coins} نقطة.\nيمكنك حصد النقاط بحل مراحل أخرى أو استلام الهدية اليومية 🎁`);
-                  return false;
-                }
-              }
-
-              function claimDailyReward() {
-                const now = Date.now();
-                const elapsed = now - GameState.lastDailyRewardTime;
-                const cooldown = 24 * 3600 * 1000;
-
-                if (elapsed >= cooldown) {
-                  GameState.coins += 50;
-                  GameState.lastDailyRewardTime = now;
-                  GameState.save();
-                  AudioEngine.victory();
-                  triggerVibrate(80);
-                  alert('🎁 تهانينا!\nحصلت على المكافأة اليومية المجانية وقدرها +50 نقطة ذهبية! 🌟');
-                } else {
-                  const remainingHours = Math.ceil((cooldown - elapsed) / (3600 * 1000));
-                  AudioEngine.click();
-                  alert(`لقد استلمت مكافأتك اليومية بالفعل!\nالمكافأة القادمة ستتاح بعد حوالي ${remainingHours} ساعة.`);
-                }
-              }
-
-              function initEvents() {
-                document.getElementById('closePuzzleBtn').onclick = closePuzzle;
-                document.getElementById('openHintBtn').onclick = openHintsModal;
-                document.getElementById('closeHintBtn').onclick = closeHintsModal;
-
-                document.getElementById('settingsBtn').onclick = () => {
-                  AudioEngine.click();
-                  document.getElementById('settingsModal').classList.add('active');
-                };
-                document.getElementById('closeSettingsBtn').onclick = () => {
-                  document.getElementById('settingsModal').classList.remove('active');
-                };
-
-                document.getElementById('aboutUsBtn').onclick = () => {
-                  AudioEngine.click();
-                  document.getElementById('aboutModal').classList.add('active');
-                };
-                document.getElementById('closeAboutBtn').onclick = () => {
-                  document.getElementById('aboutModal').classList.remove('active');
-                };
-
-                document.getElementById('rulesBtn').onclick = () => {
-                  AudioEngine.click();
-                  document.getElementById('rulesModal').classList.add('active');
-                };
-                document.getElementById('closeRulesBtn').onclick = () => {
-                  document.getElementById('rulesModal').classList.remove('active');
-                };
-
-                document.getElementById('dailyRewardBtn').onclick = claimDailyReward;
-
-                const soundToggle = document.getElementById('soundToggle');
-                const vibrateToggle = document.getElementById('vibrateToggle');
-                const themeToggle = document.getElementById('themeToggle');
-                const fontSizeSelect = document.getElementById('fontSizeSelect');
-
-                soundToggle.checked = GameState.settings.sound;
-                vibrateToggle.checked = GameState.settings.vibration;
-                themeToggle.checked = (GameState.settings.theme === 'dark');
-                fontSizeSelect.value = GameState.settings.fontSize;
-
-                soundToggle.onchange = (e) => {
-                  GameState.settings.sound = e.target.checked;
-                  GameState.save();
-                };
-                vibrateToggle.onchange = (e) => {
-                  GameState.settings.vibration = e.target.checked;
-                  GameState.save();
-                };
-                themeToggle.onchange = (e) => {
-                  GameState.settings.theme = e.target.checked ? 'dark' : 'light';
-                  applyTheme();
-                  GameState.save();
-                };
-                fontSizeSelect.onchange = (e) => {
-                  GameState.settings.fontSize = e.target.value;
-                  applyFontSize();
-                  GameState.save();
-                };
-
-                document.getElementById('resetProgressBtn').onclick = () => {
-                  if (confirm('هل أنت متأكد من رغبتك في إعادة ضبط اللعبة ومسح كل تقدمك ونقاطك بالكامل؟')) {
-                    localStorage.removeItem('ammar_alghaz_save');
-                    location.reload();
+                },
+                removeWordLetterAt(index) {
+                  SoundEngine.tap();
+                  const removed = this.wordState.entered.splice(index, 1)[0];
+                  if (removed) this.wordState.disabledTileIdxs = this.wordState.disabledTileIdxs.filter(i => i !== removed.tileIdx);
+                  this.renderWordUI();
+                },
+                backspaceWord() {
+                  if (this.wordState.entered.length === 0) return;
+                  SoundEngine.tap();
+                  const last = this.wordState.entered.pop();
+                  if (last) this.wordState.disabledTileIdxs = this.wordState.disabledTileIdxs.filter(i => i !== last.tileIdx);
+                  this.renderWordUI();
+                },
+                clearWord() {
+                  SoundEngine.tap();
+                  this.wordState.entered = [];
+                  this.wordState.disabledTileIdxs = [];
+                  this.renderWordUI();
+                },
+                setupMemoryMode(mode) {
+                  document.getElementById("container-mode-memory").classList.remove("hidden");
+                  const items = [...mode.pairs, ...mode.pairs].sort(() => Math.random() - 0.5);
+                  this.memoryState = { items, flipped: [], matchedCount: 0, locked: false };
+                  const grid = document.getElementById("memory-grid-container");
+                  grid.innerHTML = "";
+                  document.getElementById("memory-moves-counter").innerText = `المطابقات: 0 / ${mode.pairs.length}`;
+                  items.forEach((icon, idx) => {
+                    const card = document.createElement("div");
+                    card.className = "mem-card";
+                    card.innerHTML = `<div class="mem-inner"><div class="mem-back">❓</div><div class="mem-front">${icon}</div></div>`;
+                    card.onclick = () => this.flipMemoryCard(card, idx, icon, mode.pairs.length);
+                    grid.appendChild(card);
+                  });
+                },
+                flipMemoryCard(cardEl, idx, icon, total) {
+                  if (this.memoryState.locked || cardEl.classList.contains("flipped") || cardEl.classList.contains("matched")) return;
+                  SoundEngine.tap();
+                  triggerHaptic(25);
+                  cardEl.classList.add("flipped");
+                  this.memoryState.flipped.push({ cardEl, idx, icon });
+                  if (this.memoryState.flipped.length === 2) {
+                    this.memoryState.locked = true;
+                    const [c1, c2] = this.memoryState.flipped;
+                    if (c1.icon === c2.icon) {
+                      SoundEngine.correct();
+                      triggerHaptic(60);
+                      setTimeout(() => {
+                        c1.cardEl.classList.add("matched");
+                        c2.cardEl.classList.add("matched");
+                        this.memoryState.flipped = [];
+                        this.memoryState.matchedCount++;
+                        document.getElementById("memory-moves-counter").innerText = `المطابقات: ${this.memoryState.matchedCount} / ${total}`;
+                        this.memoryState.locked = false;
+                        if (this.memoryState.matchedCount === total) this.handleModeSuccess();
+                      }, 300);
+                    } else {
+                      SoundEngine.wrong();
+                      triggerHaptic(80);
+                      setTimeout(() => {
+                        c1.cardEl.classList.remove("flipped");
+                        c2.cardEl.classList.remove("flipped");
+                        this.memoryState.flipped = [];
+                        this.memoryState.locked = false;
+                      }, 750);
+                    }
                   }
-                };
-              }
-
-              function applyTheme() {
-                if (GameState.settings.theme === 'light') {
-                  document.body.classList.add('light-theme');
-                } else {
-                  document.body.classList.remove('light-theme');
+                },
+                setupOptionsMode(mode) {
+                  document.getElementById("container-mode-options").classList.remove("hidden");
+                  const grid = document.getElementById("options-grid-container");
+                  grid.innerHTML = "";
+                  mode.options.forEach((optText, optIdx) => {
+                    const btn = document.createElement("button");
+                    btn.className = "option-btn";
+                    btn.innerHTML = `<span>${optText}</span><span>⭘</span>`;
+                    btn.onclick = () => {
+                      if (btn.classList.contains("correct") || btn.classList.contains("wrong")) return;
+                      if (optIdx === mode.answerIndex) {
+                        btn.classList.add("correct");
+                        this.handleModeSuccess();
+                      } else {
+                        SoundEngine.wrong();
+                        triggerHaptic(100);
+                        btn.classList.add("wrong");
+                      }
+                    };
+                    grid.appendChild(btn);
+                  });
+                },
+                setupObsMode(mode) {
+                  document.getElementById("container-mode-obs").classList.remove("hidden");
+                  const grid = document.getElementById("obs-grid-container");
+                  grid.innerHTML = "";
+                  mode.items.forEach((emoji, idx) => {
+                    const item = document.createElement("div");
+                    item.className = "obs-item";
+                    item.innerText = emoji;
+                    item.onclick = () => {
+                      if (idx === mode.correctIndex) {
+                        item.style.borderColor = "#00E676";
+                        this.handleModeSuccess();
+                      } else {
+                        SoundEngine.wrong();
+                        triggerHaptic(80);
+                        item.style.borderColor = "#FF5252";
+                      }
+                    };
+                    grid.appendChild(item);
+                  });
+                },
+                handleModeSuccess() {
+                  SoundEngine.correct();
+                  triggerHaptic(80);
+                  if (!this.progress[this.currentStageIndex]) {
+                    this.progress[this.currentStageIndex] = { solvedModes: [], passed: false, stars: 0 };
+                  }
+                  const prog = this.progress[this.currentStageIndex];
+                  if (!prog.solvedModes.includes(this.currentModeIndex)) {
+                    prog.solvedModes.push(this.currentModeIndex);
+                    this.coins += 25;
+                  }
+                  if (prog.solvedModes.length >= 5) {
+                    prog.passed = true;
+                    prog.stars = prog.solvedModes.length === 6 ? 3 : 2;
+                  }
+                  this.saveStorage();
+                  this.updateHeaderUI();
+                  setTimeout(() => {
+                    if (prog.solvedModes.length === 5 && !prog.celebrated) {
+                      prog.celebrated = true;
+                      this.saveStorage();
+                      this.openVictoryModal();
+                    } else {
+                      this.showStageHub(this.currentStageIndex);
+                    }
+                  }, 550);
+                },
+                openVictoryModal() {
+                  SoundEngine.victory();
+                  launchConfetti();
+                  triggerHaptic(150);
+                  const prog = this.progress[this.currentStageIndex];
+                  document.getElementById("victory-stars-display").innerText = prog.stars === 3 ? "⭐⭐⭐" : "⭐⭐";
+                  document.getElementById("victory-modal-desc").innerText = 
+                    `رائع جداً! لقد نجحت في حل ${prog.solvedModes.length} من 6 طرق في هذه المرحلة وفتحت المرحلة التالية!`;
+                  document.getElementById("modal-victory").classList.remove("hidden");
+                },
+                goToNextStageFromModal() {
+                  this.closeModal("modal-victory");
+                  if (this.currentStageIndex + 1 < GAME_STAGES.length) {
+                    this.showStageHub(this.currentStageIndex + 1);
+                  } else {
+                    alert("مبروك! لقد أتممت جميع مراحل اللعبة بنجاح باهر!");
+                    this.renderStagesMap();
+                    this.showScreen("screen-map");
+                  }
+                },
+                checkStagePassedOrNext() {
+                  SoundEngine.tap();
+                  const prog = this.progress[this.currentStageIndex] || { solvedModes: [] };
+                  if (prog.solvedModes.length >= 5) this.openVictoryModal();
+                  else alert(`يجب عليك إكمال 5 طرق على الأقل لاجتياز المرحلة. المتبقي: ${5 - prog.solvedModes.length} طرق.`);
+                },
+                useHint() {
+                  if (this.coins < 25) { alert("عفواً! يلزم 25 عملة ذهبية لاستخدام المساعدة."); return; }
+                  SoundEngine.tap();
+                  this.coins -= 25;
+                  this.updateHeaderUI();
+                  this.saveStorage();
+                  const mode = GAME_STAGES[this.currentStageIndex].modes[this.currentModeIndex];
+                  if (mode.type === "word") {
+                    const target = mode.answer;
+                    const nextIdx = this.wordState.entered.length;
+                    if (nextIdx < target.length) {
+                      const nextChar = target[nextIdx];
+                      const tileIdx = this.wordState.tiles.findIndex((c, i) => c === nextChar && !this.wordState.disabledTileIdxs.includes(i));
+                      if (tileIdx !== -1) this.typeHexLetter(nextChar, tileIdx);
+                    }
+                  } else if (mode.type === "obs") {
+                    alert("تلميح: الرمز المطلوب يوجد في منتصف أو قرب الصف الأخير من الشبكة!");
+                  } else if (mode.options) {
+                    const opts = document.querySelectorAll(".option-btn");
+                    opts.forEach((btn, idx) => {
+                      if (idx !== mode.answerIndex && !btn.classList.contains("wrong")) {
+                        btn.style.opacity = "0.2";
+                        btn.style.pointerEvents = "none";
+                      }
+                    });
+                  }
+                },
+                openSettings() { SoundEngine.tap(); document.getElementById("modal-settings").classList.remove("hidden"); },
+                openAboutUs() { SoundEngine.tap(); document.getElementById("modal-about").classList.remove("hidden"); },
+                openRules() { SoundEngine.tap(); document.getElementById("modal-rules").classList.remove("hidden"); },
+                closeModal(id) { SoundEngine.tap(); document.getElementById(id).classList.add("hidden"); },
+                toggleSetting(key) {
+                  SoundEngine.tap();
+                  this.settings[key] = !this.settings[key];
+                  if (key === 'sound') SoundEngine.enabled = this.settings.sound;
+                  this.syncSettingsToggles();
+                  this.saveStorage();
+                },
+                syncSettingsToggles() {
+                  const s = document.getElementById("toggle-sound");
+                  const v = document.getElementById("toggle-vibe");
+                  if (this.settings.sound) s.classList.add("on"); else s.classList.remove("on");
+                  if (this.settings.vibe) v.classList.add("on"); else v.classList.remove("on");
+                },
+                confirmResetProgress() {
+                  SoundEngine.tap();
+                  if (confirm("هل أنت متأكد من رغبتك في إعادة ضبط اللعبة والبدء من المرحلة الأولى؟")) {
+                    this.progress = {};
+                    this.coins = 300;
+                    this.stars = 0;
+                    this.saveStorage();
+                    this.updateHeaderUI();
+                    this.closeModal("modal-settings");
+                    this.renderStagesMap();
+                    this.showScreen("screen-map");
+                  }
                 }
-              }
-
-              function applyFontSize() {
-                document.body.classList.remove('font-large', 'font-xlarge');
-                if (GameState.settings.fontSize === 'large') {
-                  document.body.classList.add('font-large');
-                } else if (GameState.settings.fontSize === 'xlarge') {
-                  document.body.classList.add('font-xlarge');
-                }
-              }
-
-              window.onload = () => {
-                GameState.load();
-                applyTheme();
-                applyFontSize();
-                GameState.updateHeader();
-                initEvents();
-                renderStagesView();
               };
+
+              window.addEventListener("DOMContentLoaded", () => Game.init());
             </script>
           </body>
           </html>
-          ''')
+          EOF
 
-          print("All Android project files created successfully!")
-          PY_EOF
-
-      - name: Download Gradle 8.4
+      - name: Setup Gradle Wrapper
         run: |
-          wget -q https://services.gradle.org/distributions/gradle-8.4-bin.zip
-          unzip -q gradle-8.4-bin.zip
+          if command -v gradle &> /dev/null; then
+            gradle wrapper --gradle-version 8.5
+          else
+            wget -q https://services.gradle.org/distributions/gradle-8.5-bin.zip -P /tmp
+            unzip -q /tmp/gradle-8.5-bin.zip -d /tmp
+            /tmp/gradle-8.5/bin/gradle wrapper
+          fi
+          chmod +x gradlew
 
       - name: Build Android Debug APK
         run: |
-          ./gradle-8.4/bin/gradle assembleDebug --stacktrace
+          ./gradlew assembleDebug --stacktrace
 
       - name: Upload APK as Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: Arabic-Puzzle-Game-Ammar-Alhilali
-          path: app/build/outputs/apk/debug/app-debug.apk
-          retention-days: 30
-
-      - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
-        if: startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch'
-        continue-on-error: true
-        with:
-          tag_name: v1.0.0
-          name: "لعبة الألغاز العربية - إصدار 1.0.0"
-          body: |
-            ## 🎮 لعبة ألغاز وتحدي المعرفة (Android APK)
-            **تصميم وبرمجة: عمار الهلالي**
-
-            ### ✨ ميزات التطبيق:
-            - **مراحل متعددة:** تبدأ بواحة الأذكياء وصولاً إلى قمة العباقرة.
-            - **6 طرق متنوعة لكل مرحلة:**
-              1. سؤال وتحدي (اختيار من متعدد)
-              2. الحروف المبعثرة (فك الشفرة)
-              3. حزورة وفزورة بليغة (أنا من أكون؟)
-              4. سرعة البديهة (تحدي صح أو خطأ في 15 ثانية)
-              5. الرابط المشترك (4 كلمات ورابط خفي واحد)
-              6. مطابقة الذاكرة والمفاهيم (أزواج الكلمات)
-            - **شرط النجاح:** الإجابة على 5 طرق على الأقل لفتح المرحلة التالية.
-            - **نظام النقاط والمساعدات:** رصيد ذهبي، مكافأة يومية مجانية، ومساعدات ذكية.
-            - **قائمة الإعدادات:** تضم زر "من نحن" (تصميم وبرمجة عمار الهلالي)، تحكم بالمؤثرات الصوتية والاهتزاز، والوضع الليلي، والخطوط.
-          files: app/build/outputs/apk/debug/app-debug.apk
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          name: Arabic-Puzzle-Game-APK
+          path: app/build/outputs/apk/debug/*.apk
+          retention-days: 14
