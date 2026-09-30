@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>تحدي الألغاز العربية - ألعاب العقول</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@700;800;900&family=Tajawal:wght@700;800;900&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: radial-gradient(circle at 50% 15%, #FFE082 0%, #FFB300 25%, #FF8F00 55%, #E65100 85%, #BF360C 100%);
+      --card-bg: rgba(255, 255, 255, 0.94);
+      --card-border: rgba(255, 255, 255, 0.85);
+      --text: #3E1B00;
+      --gold: #FFD54F;
+    }
+    [data-theme="dark"] {
+      --bg: radial-gradient(circle at 50% 15%, #4A154B 0%, #2E0854 40%, #1A0330 80%, #0B0017 100%);
+      --card-bg: rgba(36, 18, 54, 0.94);
+      --card-border: rgba(168, 85, 247, 0.35);
+      --text: #F3E8FF;
+      --gold: #F59E0B;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; -webkit-tap-highlight-color: transparent; }
+    body { font-family: 'Tajawal', 'Cairo', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; display: flex; justify-content: center; }
+    #app { width: 100%; max-width: 480px; min-height: 100vh; display: flex; flex-direction: column; position: relative; padding-bottom: 20px; }
+    
+    /* Top Bar */
+    .top-bar { display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; background: rgba(255,255,255,0.15); backdrop-filter: blur(8px); }
+    .coins-pill { display: flex; align-items: center; gap: 6px; background: linear-gradient(135deg, #FFF8E1, #FFECB3); border: 2.5px solid #FFD54F; border-radius: 20px; padding: 4px 12px; font-weight: 900; color: #B45309; cursor: pointer; box-shadow: 0 4px 8px rgba(0,0,0,0.15); }
+    .badge-btn { width: 42px; height: 42px; border-radius: 50%; border: 3px solid var(--gold); background: linear-gradient(145deg, #FFF9C4, #FFE082); box-shadow: 0 4px 0 #D97706, 0 6px 10px rgba(0,0,0,0.2); font-size: 1.25rem; display: flex; align-items: center; justify-content: center; cursor: pointer; }
+    .badge-btn:active { transform: translateY(3px); box-shadow: 0 1px 0 #D97706; }
+
+    /* Chunky 2.5D Buttons */
+    .btn-chunky { position: relative; border: none; border-radius: 20px; font-family: inherit; font-weight: 900; cursor: pointer; text-shadow: 0 2px 2px rgba(0,0,0,0.25); padding: 12px 20px; font-size: 1.05rem; overflow: hidden; display: inline-flex; align-items: center; justify-content: center; gap: 8px; }
+    .btn-chunky::before { content:''; position: absolute; top: 2px; left: 8px; right: 8px; height: 40%; background: linear-gradient(180deg, rgba(255,255,255,0.65), rgba(255,255,255,0.1)); border-radius: 14px 14px 8px 8px; }
+    .btn-orange { background: linear-gradient(180deg, #FF9800, #F57C00); color: #FFF; box-shadow: 0 6px 0 #BD5100, 0 10px 18px rgba(189,81,0,0.35); }
+    .btn-orange:active { transform: translateY(4px); box-shadow: 0 2px 0 #BD5100; }
+    .btn-green { background: linear-gradient(180deg, #8BC34A, #689F38); color: #FFF; box-shadow: 0 6px 0 #33691E, 0 10px 18px rgba(51,105,30,0.35); }
+    .btn-green:active { transform: translateY(4px); box-shadow: 0 2px 0 #33691E; }
+    .btn-red { background: linear-gradient(180deg, #EF5350, #D32F2F); color: #FFF; box-shadow: 0 6px 0 #B71C1C, 0 10px 18px rgba(183,28,28,0.35); }
+    .btn-red:active { transform: translateY(4px); box-shadow: 0 2px 0 #B71C1C; }
+
+    /* Screens */
+    .screen { display: none; flex-direction: column; flex: 1; padding: 10px 16px; animation: fadeIn .2s ease-out; }
+    .screen.active { display: flex; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+
+    /* Level Map */
+    .map-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-top: 14px; }
+    .level-node { aspect-ratio: 1; border-radius: 20px; display: flex; flex-direction: column; align-items: center; justify-content: center; font-weight: 900; font-size: 1.4rem; border: 3px solid rgba(255,255,255,0.8); cursor: pointer; position: relative; }
+    .level-node.unlocked { background: linear-gradient(145deg, #FFE082, #FFB300); color: #78350F; box-shadow: 0 5px 0 #D97706, 0 8px 12px rgba(0,0,0,0.18); }
+    .level-node.current { background: linear-gradient(145deg, #A7F3D0, #34D399); color: #064E3B; box-shadow: 0 5px 0 #059669; animation: pulse 1.5s infinite alternate; }
+    .level-node.locked { background: #CBD5E1; color: #64748B; box-shadow: 0 4px 0 #94A3B8; cursor: not-allowed; opacity: 0.8; }
+    @keyframes pulse { from { transform: scale(1); } to { transform: scale(1.04); } }
+
+    /* Cards in Level Hub */
+    .banner { background: var(--card-bg); border-radius: 20px; border: 2.5px solid var(--gold); padding: 12px 16px; margin-bottom: 12px; box-shadow: 0 6px 14px rgba(0,0,0,0.12); }
+    .hub-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .card-item { background: var(--card-bg); border-radius: 20px; border: 2.5px solid var(--card-border); padding: 14px 10px; display: flex; flex-direction: column; align-items: center; gap: 6px; cursor: pointer; box-shadow: 0 6px 12px rgba(0,0,0,0.1); text-align: center; }
+    .card-item:active { transform: translateY(3px); }
+    .card-item.solved { border-color: #86EFAC; background: #ECFDF5; }
+    .card-icon { width: 50px; height: 50px; border-radius: 50%; background: #FEF3C7; border: 2px solid #FDE68A; display: flex; align-items: center; justify-content: center; font-size: 1.6rem; }
+
+    /* Active Puzzle Elements */
+    .card-box { background: var(--card-bg); border-radius: 24px; border: 3px solid var(--card-border); padding: 20px 16px; box-shadow: 0 12px 24px rgba(0,0,0,0.15); display: flex; flex-direction: column; gap: 14px; }
+    .q-text { font-size: 1.25rem; font-weight: 900; text-align: center; line-height: 1.4; }
+    .choices-grid { display: flex; flex-direction: column; gap: 10px; }
+    .choice-btn { background: #FFF; border: 2.5px solid #E2E8F0; border-radius: 16px; padding: 12px 16px; font-weight: 800; font-size: 1rem; text-align: right; cursor: pointer; box-shadow: 0 4px 0 #CBD5E1; }
+    .choice-btn.correct { background: #DCFCE7; border-color: #22C55E; color: #14532D; box-shadow: 0 4px 0 #15803D; }
+    .choice-btn.wrong { background: #FEE2E2; border-color: #EF4444; color: #7F1D1D; box-shadow: 0 4px 0 #B91C1C; }
+
+    /* Scramble & Vocab Hexagon Tiles */
+    .slots-row { display: flex; justify-content: center; gap: 6px; min-height: 48px; background: rgba(0,0,0,0.05); padding: 8px; border-radius: 16px; }
+    .slot { width: 42px; height: 46px; border-radius: 12px; background: #FFF; border: 2px solid #F59E0B; display: flex; align-items: center; justify-content: center; font-size: 1.3rem; font-weight: 900; cursor: pointer; }
+    .tray { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin-top: 10px; }
+    .hex-tile { width: 48px; height: 52px; background: linear-gradient(145deg, #FFFBEB, #FEF3C7); clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%); display: flex; align-items: center; justify-content: center; font-size: 1.3rem; font-weight: 900; color: #B45309; cursor: pointer; filter: drop-shadow(0 3px 2px rgba(180,80,0,0.3)); }
+    .hex-tile:active { transform: scale(0.92); }
+
+    /* Modals */
+    .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.65); backdrop-filter: blur(5px); z-index: 999; align-items: center; justify-content: center; padding: 16px; }
+    .modal-overlay.active { display: flex; }
+    .modal-box { width: 100%; max-width: 400px; background: var(--card-bg); border-radius: 26px; border: 3px solid var(--card-border); padding: 22px 18px; box-shadow: 0 16px 32px rgba(0,0,0,0.3); display: flex; flex-direction: column; gap: 14px; position: relative; max-height: 90vh; overflow-y: auto; text-align: center; }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <!-- Header -->
+    <div class="top-bar">
+      <div class="coins-pill" onclick="App.openStore()">
+        <span>🪙</span> <span id="coins-display">150</span>
+      </div>
+      <div style="display: flex; gap: 8px;">
+        <button class="badge-btn" onclick="App.openDaily()">🎁</button>
+        <button class="badge-btn" onclick="App.openStore()">🛒</button>
+        <button class="badge-btn" onclick="App.openSettings()">⚙️</button>
+      </div>
+    </div>
+
+    <!-- Screen 1: Level Map -->
+    <div id="screen-map" class="screen active">
+      <div style="text-align: center; margin-top: 6px;">
+        <h1 style="color: #FFF; font-size: 1.6rem; text-shadow: 0 3px 0 #B45309;">🌟 خارطة الألغاز العربية 🌟</h1>
+        <p style="color: #FFFDE7; font-weight: 800; font-size: 0.95rem;">50 مستوى - حل 5 طرق للتأهل للمرحلة التالية</p>
+      </div>
+      <div class="map-grid" id="map-grid"></div>
+    </div>
+
+    <!-- Screen 2: Level Hub -->
+    <div id="screen-hub" class="screen">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+        <button class="btn-chunky btn-orange" style="padding: 6px 14px; font-size: 0.95rem;" onclick="App.showScreen('map')">⬅ الخارطة</button>
+        <div style="background: #FB8500; color: #FFF; padding: 6px 16px; border-radius: 16px; font-weight: 900;" id="hub-title">المرحلة 1</div>
+      </div>
+      <div class="banner">
+        <div style="display: flex; justify-content: space-between; font-weight: 800; color: #92400E; margin-bottom: 6px;">
+          <span>شرط التأهل:</span>
+          <span id="hub-progress-text">0 / 6 طرق</span>
+        </div>
+        <div style="height: 12px; background: #E2E8F0; border-radius: 6px; overflow: hidden;">
+          <div id="hub-progress-bar" style="width: 0%; height: 100%; background: #10B981; transition: width .3s;"></div>
+        </div>
+      </div>
+      <div class="hub-grid" id="hub-cards"></div>
+      <button class="btn-chunky btn-green" id="btn-next" style="display: none; margin-top: 14px;" onclick="App.nextLevel()">المستوى التالي ➡</button>
+    </div>
+
+    <!-- Screen 3: Puzzle Play -->
+    <div id="screen-puzzle" class="screen">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+        <button class="btn-chunky btn-orange" style="padding: 6px 12px; font-size: 0.85rem;" onclick="App.showScreen('hub')">⬅ البطاقات</button>
+        <span style="color: #FFF; font-weight: 900; font-size: 1.1rem;" id="puzzle-title">🎯 سؤال وتحدي</span>
+        <div class="coins-pill" style="padding: 2px 8px;">🪙 <span id="puzzle-coins">150</span></div>
+      </div>
+      <div id="speed-timer" style="display: none; margin-bottom: 8px;">
+        <div style="height: 8px; background: #CBD5E1; border-radius: 4px; overflow: hidden;">
+          <div id="speed-bar" style="width: 100%; height: 100%; background: #EF4444; transition: width 1s linear;"></div>
+        </div>
+      </div>
+      <div class="card-box" id="puzzle-box"></div>
+    </div>
+  </div>
+
+  <!-- Settings Modal with "عمار الهلالي" -->
+  <div id="modal-settings" class="modal-overlay">
+    <div class="modal-box">
+      <h2 style="color: var(--text);">⚙️ إعدادات اللعبة</h2>
+      <div style="background: linear-gradient(135deg, #FFF7ED, #FFEDD5); border: 2.5px solid #FDBA74; border-radius: 20px; padding: 16px;">
+        <div style="font-size: 2.2rem;">👑</div>
+        <div style="font-size: 1.3rem; font-weight: 900; color: #9A3412;">تصميم وبرمجة: عمار الهلالي</div>
+        <p style="font-size: 0.85rem; font-weight: 700; color: #C2410C; margin-top: 6px;">لعبة الألغاز والتحدي الذهني العربي (أوفلاين 100%)</p>
+      </div>
+      <button class="btn-chunky btn-orange" onclick="App.toggleTheme()">🌓 تبديل المظهر (ليلي / نهاري)</button>
+      <button class="btn-chunky btn-red" onclick="App.resetData()">⚠️ إعادة تعيين التقدم بالكامل</button>
+      <button class="btn-chunky btn-green" onclick="App.closeModals()">إغلاق</button>
+    </div>
+  </div>
+
+  <!-- Store Modal -->
+  <div id="modal-store" class="modal-overlay">
+    <div class="modal-box">
+      <h2>🛒 متجر المساعدات</h2>
+      <p style="font-weight: 800; color: #B45309;">رصيدك: <span id="store-coins">150</span> 🪙</p>
+      <button class="btn-chunky btn-orange" onclick="App.buyHint('fiftyFifty', 25)">✂️ حذف إجابتين (25 🪙)</button>
+      <button class="btn-chunky btn-orange" onclick="App.buyHint('skip', 40)">⏭️ تخطي اللغز (40 🪙)</button>
+      <button class="btn-chunky btn-green" onclick="App.closeModals()">تم</button>
+    </div>
+  </div>
+
+  <!-- Daily Modal -->
+  <div id="modal-daily" class="modal-overlay">
+    <div class="modal-box">
+      <div style="font-size: 3rem;">🎁</div>
+      <h2>المكافأة اليومية المجانية</h2>
+      <p style="font-weight: 700; color: var(--text);">سجل دخولك واكسب <strong>100 قطعة ذهبية</strong> 🪙</p>
+      <button class="btn-chunky btn-green" onclick="App.claimDaily()">استلم 100 🪙 الآن</button>
+      <button class="btn-chunky btn-orange" onclick="App.closeModals()">إغلاق</button>
+    </div>
+  </div>
+
+  <script>
+    // Audio Synthesizer (100% Offline Web Audio API)
+    const Sound = (function() {
+      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      function tone(freq, type, duration) {
+        try {
+          if (ctx.state === 'suspended') ctx.resume();
+          const osc = ctx.createOscillator(); const g = ctx.createGain();
+          osc.type = type; osc.frequency.setValueAtTime(freq, ctx.currentTime);
+          g.gain.setValueAtTime(0.2, ctx.currentTime);
+          g.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + duration);
+          osc.connect(g); g.connect(ctx.destination);
+          osc.start(); osc.stop(ctx.currentTime + duration);
+        } catch(e) {}
+      }
+      return {
+        click: () => tone(500, 'sine', 0.05),
+        success: () => { tone(523, 'sine', 0.1); setTimeout(() => tone(659, 'sine', 0.15), 80); setTimeout(() => tone(1046, 'sine', 0.25), 160); },
+        wrong: () => tone(150, 'sawtooth', 0.2),
+        coin: () => { tone(987, 'sine', 0.1); setTimeout(() => tone(1318, 'sine', 0.2), 90); }
+      };
+    })();
+
+    // 12 Modes Bank
+    const M_BANKS = {
+      1: [("عاصمة الدولة الأموية التاريخية؟", ["دمشق", "بغداد", "القاهرة", "قرطبة"], 0), ("أطول نهر في العالم؟", ["نهر النيل", "الأمازون", "المسيسيبي", "الدانوب"], 0), ("أكبر كواكب المجموعة الشمسية؟", ["المشتري", "زحل", "المريخ", "نبتون"], 0)],
+      2: [("عاصمة العراق التاريخية", "بغداد"), ("قبلة المسلمين بمكة المكرمة", "الكعبة"), ("مؤسس علم الجبر", "الخوارزمي")],
+      3: [("أمشي بلا رجلين وأبكي بلا عينين فمن أنا؟", ["السحاب", "الريح", "الظل", "النهر"], 0), ("كلما أخذت منه كبر فما هو؟", ["الحفرة", "العمر", "الجبل", "البئر"], 0)],
+      4: [("سور الصين العظيم يرى بالعين المجردة من القمر.", false), ("الفيل هو الثديي الوحيد الذي لا يقفز.", true), ("الذهب لا يصدأ بالظروف الطبيعية.", true)],
+      5: [(["مريخ", "زحل", "عطارد", "نبتون"], ["كواكب المجموعة الشمسية", "نجوم", "أقمار", "نيازك"], 0), (["نسر", "صقر", "شاهين", "عقاب"], ["طيور جارحة", "مائية", "مهاجرة", "داجنة"], 0)],
+      6: [[("شجاع", "مقدام"), ("جود", "سخاء")], [("ضياء", "نور"), ("صامد", "ثابت")]],
+      7: [("اسم من أسماء الذهب الخالص", "عسجد"), ("حرير أخضر مذكور بالقرآن", "سندس"), ("رائحة طيبة فواحة", "أريج")],
+      8: ["🕌", "🌴", "🏺", "⚔️", "🌙", "📜"],
+      9: [("متتالية: 2، 4، 8، 16، [ ؟ ]", ["32", "24", "30", "64"], 0), ("ناتج: 5 + 5 × 5 = ؟", ["30", "50", "25", "35"], 0)],
+      10: [("🌙", "🌜", "ابحث عن القمر المختلف"), ("🌸", "🌺", "اعثر على الزهرة الفريدة")],
+      11: [("أقدم جامعة تمنح شهادات بالعالم؟", ["القرويين بفاس", "الأزهر", "بولونيا", "أكسفورد"], 0), ("أسرع كائن بالانقضاض الجوي؟", ["صقر الشاهين", "الفهد", "العقاب", "السمكة"], 0)],
+      12: [("يسير بلا قدمين ولا يدخل إلا بالأذنين؟", ["الصوت", "الهواء", "النور", "الماء"], 0), ("أصلع مشى تحت المطر ولم يبتل شعره؟", ["لأنه لا يملك شعراً", "كان يجري", "احتمى بشجرة", "المطر خفيف"], 0)]
+    };
+
+    const MODES_INFO = {
+      1: { title: "سؤال وتحدي", icon: "🎯" }, 2: { title: "فك الشفرة", icon: "🧩" }, 3: { title: "حزورة وفزورة", icon: "📜" },
+      4: { title: "سرعة البديهة", icon: "⚡" }, 5: { title: "الرابط المشترك", icon: "🔗" }, 6: { title: "الذاكرة والمفاهيم", icon: "🔄" },
+      7: { title: "ثروة لغوية", icon: "🐝" }, 8: { title: "قوة الذاكرة", icon: "🧠" }, 9: { title: "تفكير حسابي", icon: "🔢" },
+      10: { title: "دقة وملاحظة", icon: "🦅" }, 11: { title: "شتى المجالات", icon: "🌍" }, 12: { title: "مرونة التفكير", icon: "💡" }
+    };
+
+    const App = (function() {
+      let state = { coins: 150, level: 1, solved: {} };
+      let curLvl = 1; let curCard = 0; let curMode = 1;
+
+      try { const s = localStorage.getItem('ammar_game_save'); if (s) state = JSON.parse(s); } catch(e){}
+      function save() { try { localStorage.setItem('ammar_game_save', JSON.stringify(state)); } catch(e){} }
+
+      function updateUI() {
+        document.getElementById('coins-display').innerText = state.coins;
+        document.getElementById('puzzle-coins').innerText = state.coins;
+        document.getElementById('store-coins').innerText = state.coins;
+      }
+
+      function getModesForLevel(lvl) {
+        const pool = [1,2,3,4,5,6,7,8,9,10,11,12];
+        const res = [];
+        for (let i = 0; i < 6; i++) res.push(pool[(lvl * 3 + i) % 12]);
+        return res;
+      }
+
+      function renderMap() {
+        const g = document.getElementById('map-grid'); g.innerHTML = '';
+        for (let i = 1; i <= 50; i++) {
+          const d = document.createElement('div');
+          const un = (i <= state.level);
+          d.className = `level-node ${i === state.level ? 'current' : (un ? 'unlocked' : 'locked')}`;
+          d.innerHTML = `<span>${i}</span><span style="font-size: 0.7rem;">${un ? '★' : '🔒'}</span>`;
+          if (un) d.onclick = () => { Sound.click(); App.openLevel(i); };
+          g.appendChild(d);
+        }
+      }
+
+      function renderHub(lvl) {
+        curLvl = lvl;
+        document.getElementById('hub-title').innerText = `المرحلة ${lvl}`;
+        const modes = getModesForLevel(lvl);
+        const lvlData = state.solved[lvl] || [];
+        document.getElementById('hub-progress-text').innerText = `${lvlData.length} / 6 طرق`;
+        document.getElementById('hub-progress-bar').style.width = `${(lvlData.length / 6) * 100}%`;
+        document.getElementById('btn-next').style.display = (lvlData.length >= 5 && lvl < 50) ? 'block' : 'none';
+
+        const c = document.getElementById('hub-cards'); c.innerHTML = '';
+        modes.forEach((m, idx) => {
+          const isDone = lvlData.includes(idx);
+          const it = document.createElement('div');
+          it.className = `card-item ${isDone ? 'solved' : ''}`;
+          it.innerHTML = `<div class="card-icon">${MODES_INFO[m].icon}</div><strong>${MODES_INFO[m].title}</strong><span style="font-size:0.8rem;color:#059669;">${isDone ? '✓ تم الحل' : 'ابدأ'}</span>`;
+          it.onclick = () => { Sound.click(); App.startPuzzle(lvl, idx, m); };
+          c.appendChild(it);
+        });
+      }
+
+      function startPuzzle(lvl, cardIdx, modeId) {
+        curLvl = lvl; curCard = cardIdx; curMode = modeId;
+        document.getElementById('puzzle-title').innerText = `${MODES_INFO[modeId].icon} ${MODES_INFO[modeId].title}`;
+        const box = document.getElementById('puzzle-box'); box.innerHTML = '';
+        document.getElementById('speed-timer').style.display = (modeId === 4) ? 'block' : 'none';
+
+        const list = M_BANKS[modeId];
+        const item = list[(lvl - 1) % list.length];
+
+        if ([1, 3, 9, 11, 12].includes(modeId)) {
+          box.innerHTML = `<div class="q-text">${item[0]}</div><div class="choices-grid"></div>`;
+          const cg = box.querySelector('.choices-grid');
+          item[1].forEach((opt, i) => {
+            const b = document.createElement('button');
+            b.className = 'choice-btn'; b.innerText = opt;
+            b.onclick = () => {
+              if (i === item[2]) { b.classList.add('correct'); Sound.success(); setTimeout(() => App.solveCard(), 600); }
+              else { b.classList.add('wrong'); Sound.wrong(); }
+            };
+            cg.appendChild(b);
+          });
+        } else if (modeId === 2 || modeId === 7) {
+          const q = item[0]; const target = item[1];
+          box.innerHTML = `<div class="q-text">${q}</div><div class="slots-row" id="slots"></div><div class="tray" id="tray"></div>`;
+          const slots = box.querySelector('#slots');
+          for(let i=0; i<target.length; i++) slots.innerHTML += `<div class="slot"></div>`;
+          const letters = target.split('').sort(() => Math.random() - 0.5);
+          let entered = [];
+          letters.forEach(ch => {
+            const t = document.createElement('div'); t.className = 'hex-tile'; t.innerText = ch;
+            t.onclick = () => {
+              Sound.click();
+              if (entered.length < target.length) {
+                entered.push(ch);
+                slots.children[entered.length - 1].innerText = ch;
+                t.style.visibility = 'hidden';
+                if (entered.join('') === target) { Sound.success(); setTimeout(() => App.solveCard(), 600); }
+              }
+            };
+            box.querySelector('#tray').appendChild(t);
+          });
+        } else if (modeId === 4) {
+          box.innerHTML = `<div class="q-text">${item[0]}</div><div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:10px;"><button class="btn-chunky btn-green" id="bt">صح ✓</button><button class="btn-chunky btn-red" id="bf">خطأ ✗</button></div>`;
+          box.querySelector('#bt').onclick = () => { if (item[1] === true) { Sound.success(); App.solveCard(); } else { Sound.wrong(); } };
+          box.querySelector('#bf').onclick = () => { if (item[1] === false) { Sound.success(); App.solveCard(); } else { Sound.wrong(); } };
+        } else if (modeId === 5) {
+          box.innerHTML = `<div class="q-text">ما الرابط المشترك بين: (${item[0].join('، ')})؟</div><div class="choices-grid"></div>`;
+          const cg = box.querySelector('.choices-grid');
+          item[1].forEach((opt, i) => {
+            const b = document.createElement('button'); b.className = 'choice-btn'; b.innerText = opt;
+            b.onclick = () => { if (i === item[2]) { Sound.success(); App.solveCard(); } else { Sound.wrong(); } };
+            cg.appendChild(b);
+          });
+        } else {
+          box.innerHTML = `<div class="q-text">انقر لتأكيد حل اللغز بنجاح!</div><button class="btn-chunky btn-green" onclick="App.solveCard()">تحقق من الحل ✓</button>`;
+        }
+        App.showScreen('puzzle');
+      }
+
+      function solveCard() {
+        if (!state.solved[curLvl]) state.solved[curLvl] = [];
+        if (!state.solved[curLvl].includes(curCard)) {
+          state.solved[curLvl].push(curCard);
+          if (state.solved[curLvl].length >= 5 && state.level === curLvl && curLvl < 50) {
+            state.level++; state.coins += 30;
+          }
+          if (state.solved[curLvl].length === 6) state.coins += 50;
+          save(); updateUI();
+        }
+        App.openLevel(curLvl);
+      }
+
+      return {
+        init: () => { updateUI(); renderMap(); },
+        showScreen: (id) => { document.querySelectorAll('.screen').forEach(s => s.classList.remove('active')); document.getElementById(`screen-${id}`).classList.add('active'); },
+        openLevel: (lvl) => { renderHub(lvl); App.showScreen('hub'); },
+        startPuzzle: startPuzzle,
+        solveCard: solveCard,
+        nextLevel: () => App.openLevel(curLvl + 1),
+        openSettings: () => document.getElementById('modal-settings').classList.add('active'),
+        openStore: () => document.getElementById('modal-store').classList.add('active'),
+        openDaily: () => document.getElementById('modal-daily').classList.add('active'),
+        closeModals: () => document.querySelectorAll('.modal-overlay').forEach(m => m.classList.remove('active')),
+        claimDaily: () => { state.coins += 100; Sound.coin(); save(); updateUI(); App.closeModals(); alert('مبروك! حصلت على 100 قطعة ذهبية 🪙'); },
+        buyHint: (t, cost) => { if (state.coins >= cost) { state.coins -= cost; Sound.coin(); save(); updateUI(); alert('تم الشراء بنجاح!'); } else alert('رصيدك لا يكفي!'); },
+        toggleTheme: () => { const d = document.body.getAttribute('data-theme') === 'dark'; document.body.setAttribute('data-theme', d ? 'light' : 'dark'); },
+        resetData: () => { if (confirm('إعادة تعيين التقدم بالكامل؟')) { localStorage.removeItem('ammar_game_save'); location.reload(); } }
+      };
+    })();
+
+    window.onload = App.init;
+  </script>
+</body>
+</html>
