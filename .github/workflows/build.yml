@@ -24,10 +24,14 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
-      - name: إعداد حزمة أدوات أندرويد (Setup Android SDK)
-        uses: android-actions/setup-android@v3
+      - name: تهيئة حزمة أندرويد وقبول الرخص (Setup Android SDK)
+        run: |
+          echo "ANDROID_HOME=/usr/local/lib/android/sdk" >> $GITHUB_ENV
+          echo "ANDROID_SDK_ROOT=/usr/local/lib/android/sdk" >> $GITHUB_ENV
+          echo "sdk.dir=/usr/local/lib/android/sdk" > local.properties
+          yes | /usr/local/lib/android/sdk/cmdline-tools/latest/bin/sdkmanager --licenses 2>/dev/null || true
 
-      - name: تثبيت نظام البناء السريع Gradle
+      - name: تثبيت نظام البناء Gradle
         run: |
           wget -q https://services.gradle.org/distributions/gradle-8.5-bin.zip
           unzip -q gradle-8.5-bin.zip
@@ -125,7 +129,7 @@ jobs:
           </manifest>
           ENDMANIFEST
 
-          # 5. MainActivity.java (مع جسر الاهتزاز والشاشة الكاملة والتشغيل الأوفلاين)
+          # 5. MainActivity.java
           cat << 'ENDJAVA' > app/src/main/java/com/ammar/puzzle/MainActivity.java
           package com.ammar.puzzle;
 
@@ -164,7 +168,7 @@ jobs:
                   settings.setAllowContentAccess(true);
                   settings.setMediaPlaybackRequiresUserGesture(false);
 
-                  // Native Android Bridge for Haptics
+                  // Native Android Bridge for Haptic Feedback
                   webView.addJavascriptInterface(new WebAppInterface(this), "AndroidBridge");
 
                   webView.setWebViewClient(new WebViewClient());
@@ -211,7 +215,7 @@ jobs:
           </resources>
           ENDSTRINGS
 
-          # 7. أيقونة التطبيق الرسمية الذهبية
+          # 7. أيقونة التطبيق الذهبية
           python3 -c "
           import zlib, struct
           def make_png(w, h, c):
@@ -229,24 +233,7 @@ jobs:
               f.write(make_png(72, 72, (251, 133, 0)))
           "
 
-          # 8. توليد ملف لعبة الألغاز العربية كاملاً (50 مرحلة، 12 طريقة، ومؤثرات صوتية)
-          cat << 'EOF_BUILD_GAME' > build_game.py
-          import json, os
-
-          # نصوص الألغاز والمراحل الـ 50 الكاملة للـ 12 أسلوباً
-          with open('dataset_temp.py', 'w', encoding='utf-8') as f:
-              pass
-          EOF_BUILD_GAME
-
-          # بناء ملف اللعبة HTML5 المطور
-          python3 -c '
-          import urllib.request, json, os
-
-          # إنشاء واجهة اللعبة والمحرك البرمجي المتكامل
-          print("تجهيز محرك الألعاب ومكتبة الأسئلة الـ 600...")
-          '
-
-          # تفكيك ملف اللعبة المضغوط بدقة عالية لضمان السرعة والكمال
+          # 8. استخراج ملف أصول اللعبة index.html
           tr -d ' ' << 'ENDB64' | base64 -d | gzip -d > app/src/main/assets/index.html
           H4sICFoyvWcC/2luZGV4Lmh0bWwA7b1pdxvHkSj4b/0r6J89eB4kM3nQ3XN6XmJm
           RmaeuWfe7p2vB8BCEkmwSNAASIp6fP5jZFVmFUkWCRbA4yN925VVRmZGRnzcmZk5
@@ -293,7 +280,7 @@ jobs:
           y59/9uTz/w90L375
           ENDB64
 
-          echo "تم بناء واستخراج ملفات اللعبة بنجاح."
+          echo "تم بناء ملفات اللعبة بنجاح."
 
       - name: تجميع ملف التطبيق (Build APK)
         run: |
