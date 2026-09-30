@@ -16,7 +16,6 @@ jobs:
     steps:
       - name: فحص المستودع (Checkout)
         uses: actions/checkout@v4
-        continue-on-error: true
 
       - name: إعداد بيئة جافا (Setup Java 17)
         uses: actions/setup-java@v4
@@ -24,10 +23,9 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
-      - name: تهيئة حزمة أندرويد وقبول الرخص (Setup Android SDK)
+      - name: تهيئة حزمة أندرويد وقبول الرخص
         run: |
           echo "ANDROID_HOME=/usr/local/lib/android/sdk" >> $GITHUB_ENV
-          echo "ANDROID_SDK_ROOT=/usr/local/lib/android/sdk" >> $GITHUB_ENV
           echo "sdk.dir=/usr/local/lib/android/sdk" > local.properties
           yes | /usr/local/lib/android/sdk/cmdline-tools/latest/bin/sdkmanager --licenses 2>/dev/null || true
 
@@ -37,43 +35,33 @@ jobs:
           unzip -q gradle-8.5-bin.zip
           echo "$PWD/gradle-8.5/bin" >> $GITHUB_PATH
 
-      - name: توليد ملفات المشروع وتطبيق الألعاب
+      - name: توليد ملفات أندرويد الأصلية
         run: |
           mkdir -p app/src/main/java/com/ammar/puzzle
           mkdir -p app/src/main/assets
           mkdir -p app/src/main/res/mipmap-hdpi
           mkdir -p app/src/main/res/values
 
-          # 1. settings.gradle
-          cat << 'ENDSETTINGS' > settings.gradle
+          # settings.gradle
+          cat << 'EOF' > settings.gradle
           rootProject.name = "AmmarPuzzleGame"
           include ':app'
-          ENDSETTINGS
+          EOF
 
-          # 2. build.gradle (Root)
-          cat << 'ENDBUILD' > build.gradle
+          # build.gradle
+          cat << 'EOF' > build.gradle
           buildscript {
-              repositories {
-                  google()
-                  mavenCentral()
-              }
-              dependencies {
-                  classpath 'com.android.tools.build:gradle:8.2.2'
-              }
+              repositories { google(); mavenCentral() }
+              dependencies { classpath 'com.android.tools.build:gradle:8.2.2' }
           }
           allprojects {
-              repositories {
-                  google()
-                  mavenCentral()
-              }
+              repositories { google(); mavenCentral() }
           }
-          ENDBUILD
+          EOF
 
-          # 3. app/build.gradle
-          cat << 'ENDAPPBUILD' > app/build.gradle
-          plugins {
-              id 'com.android.application'
-          }
+          # app/build.gradle
+          cat << 'EOF' > app/build.gradle
+          plugins { id 'com.android.application' }
           android {
               namespace 'com.ammar.puzzle'
               compileSdk 34
@@ -89,28 +77,25 @@ jobs:
                       minifyEnabled false
                       signingConfig signingConfigs.debug
                   }
-                  debug {
-                      debuggable true
-                  }
+                  debug { debuggable true }
               }
               compileOptions {
                   sourceCompatibility JavaVersion.VERSION_17
                   targetCompatibility JavaVersion.VERSION_17
               }
           }
-          ENDAPPBUILD
+          EOF
 
-          # 4. AndroidManifest.xml
-          cat << 'ENDMANIFEST' > app/src/main/AndroidManifest.xml
+          # AndroidManifest.xml
+          cat << 'EOF' > app/src/main/AndroidManifest.xml
           <?xml version="1.0" encoding="utf-8"?>
-          <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-              package="com.ammar.puzzle">
+          <manifest xmlns:android="http://schemas.android.com/apk/res/android" package="com.ammar.puzzle">
               <uses-permission android:name="android.permission.INTERNET" />
               <uses-permission android:name="android.permission.VIBRATE" />
               <application
                   android:allowBackup="true"
                   android:icon="@mipmap/ic_launcher"
-                  android:label="لعبة الألغاز"
+                  android:label="لعبة الألغاز العربية"
                   android:roundIcon="@mipmap/ic_launcher"
                   android:supportsRtl="true"
                   android:hardwareAccelerated="true"
@@ -127,22 +112,16 @@ jobs:
                   </activity>
               </application>
           </manifest>
-          ENDMANIFEST
+          EOF
 
-          # 5. MainActivity.java
-          cat << 'ENDJAVA' > app/src/main/java/com/ammar/puzzle/MainActivity.java
+          # MainActivity.java
+          cat << 'EOF' > app/src/main/java/com/ammar/puzzle/MainActivity.java
           package com.ammar.puzzle;
 
           import android.app.Activity;
           import android.os.Bundle;
-          import android.os.Build;
-          import android.os.Vibrator;
-          import android.os.VibrationEffect;
-          import android.content.Context;
           import android.view.Window;
           import android.view.WindowManager;
-          import android.webkit.JavascriptInterface;
-          import android.webkit.WebChromeClient;
           import android.webkit.WebSettings;
           import android.webkit.WebView;
           import android.webkit.WebViewClient;
@@ -154,8 +133,7 @@ jobs:
               protected void onCreate(Bundle savedInstanceState) {
                   super.onCreate(savedInstanceState);
                   requestWindowFeature(Window.FEATURE_NO_TITLE);
-                  getWindow().setFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN,
-                          WindowManager.LayoutParams.FLAG_FULLSCREEN);
+                  getWindow().setFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN, WindowManager.LayoutParams.FLAG_FULLSCREEN);
 
                   webView = new WebView(this);
                   setContentView(webView);
@@ -163,59 +141,26 @@ jobs:
                   WebSettings settings = webView.getSettings();
                   settings.setJavaScriptEnabled(true);
                   settings.setDomStorageEnabled(true);
-                  settings.setDatabaseEnabled(true);
                   settings.setAllowFileAccess(true);
-                  settings.setAllowContentAccess(true);
-                  settings.setMediaPlaybackRequiresUserGesture(false);
-
-                  // Native Android Bridge for Haptic Feedback
-                  webView.addJavascriptInterface(new WebAppInterface(this), "AndroidBridge");
 
                   webView.setWebViewClient(new WebViewClient());
-                  webView.setWebChromeClient(new WebChromeClient());
-
                   webView.loadUrl("file:///android_asset/index.html");
-              }
-
-              public class WebAppInterface {
-                  Context mContext;
-                  WebAppInterface(Context c) { mContext = c; }
-
-                  @JavascriptInterface
-                  public void vibrate(int milliseconds) {
-                      try {
-                          Vibrator v = (Vibrator) mContext.getSystemService(Context.VIBRATOR_SERVICE);
-                          if (v != null && v.hasVibrator()) {
-                              if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                                  v.vibrate(VibrationEffect.createOneShot(milliseconds, VibrationEffect.DEFAULT_AMPLITUDE));
-                              } else {
-                                  v.vibrate(milliseconds);
-                              }
-                          }
-                      } catch (Exception ignored) {}
-                  }
               }
 
               @Override
               public void onBackPressed() {
-                  if (webView.canGoBack()) {
-                      webView.goBack();
-                  } else {
-                      super.onBackPressed();
-                  }
+                  if (webView.canGoBack()) webView.goBack();
+                  else super.onBackPressed();
               }
           }
-          ENDJAVA
+          EOF
 
-          # 6. strings.xml
-          cat << 'ENDSTRINGS' > app/src/main/res/values/strings.xml
-          <?xml version="1.0" encoding="utf-8"?>
-          <resources>
-              <string name="app_name">لعبة الألغاز العربية</string>
-          </resources>
-          ENDSTRINGS
+          # strings.xml
+          cat << 'EOF' > app/src/main/res/values/strings.xml
+          <resources><string name="app_name">لعبة الألغاز العربية</string></resources>
+          EOF
 
-          # 7. أيقونة التطبيق الذهبية
+          # أيقونة التطبيق الذهبية
           python3 -c "
           import zlib, struct
           def make_png(w, h, c):
@@ -233,54 +178,9 @@ jobs:
               f.write(make_png(72, 72, (251, 133, 0)))
           "
 
-          # 8. استخراج ملف أصول اللعبة index.html
-          tr -d ' ' << 'ENDB64' | base64 -d | gzip -d > app/src/main/assets/index.html
-          H4sICFoyvWcC/2luZGV4Lmh0bWwA7b1pdxvHkSj4b/0r6J89eB4kM3nQ3XN6XmJm
-          RmaeuWfe7p2vB8BCEkmwSNAASIp6fP5jZFVmFUkWCRbA4yN925VVRmZGRnzcmZk5
-          8v3391+N05fvj1938+Z0bV97c/1g/Wq7Xv/v1oO7d158sbd7eO/FvYf3Hj58sPPd
-          0Yvtq813W4+O/vPZ3sPd3Uebn+/+/OHD3b2H+/fuvtjafrG7/eLR0b3td/fuP3jw
-          6P639x9tf7G198Xu/m/v7T18tLt978W9rc2tBztb/4b//Zcfv7t/+NX25r3tjZ3t
-          xwe3H3z+bWfvweO/u3f/79/b3n7w5MHWzve3drd3/769/W/vffHgwe723794vPP5
-          /u53d+5ubW/tPn3y6O9e3P/iwcPt+7+5d/83d7a/2f/1V4+3nt57tLN/8+73W9v3
-          Hn/x9P7O7u4P39q6d3f74Z87d7b3dn9778E/Pv12e2fr8Uefr33+l3e3d/91e/tf
-          v338cOffHj/affK3d7a/+e0X323//M7uD1+sbX33D188+vbb33389J2b//7i7v29
-          7T//+u79e39975unv/3j472/vfnk6YN/3P77Fw/u//6Lxw/u/v63dx/845N/3t35
-          n7/7zT+2n3z2t58/+Oxf//aLhz/851+8+OjB5w8+ffr8T1sP/r773b0v/u7e5t3P
-          /uHpx7/d337w939/tPvF/a0f/u5vd364+/O7/7S99+jB5/f/vPn02V98/uTRo8df
-          3L27tfmPX27/y53PHz345/d/v/Xj3a3/uPP7v//4yd/86YuffP5Pf/3k3hff/vLz
-          e3/5f1v/sfX41uOvn35x96PHzx59ce/Ro7+9d/f/e/zwq/2H/3znwff3H35275eP
-          vn56d+vx0ycf3Xv8q81/+/WjBw8fP753//Mnv/m7z7948vjJ/a0n//LFX3331b2/
-          /6vn9x88/uLpvYcP7z7++8e/3fn6b5/vPv7T77Yf/NPDX/797v9++qtv73x2759+
-          8eT+Z395f+vr7766+/jh/Yf37zz4+0ff3f/mF9v3/ub7v3v6zR8f3H38b4//8R8f
-          f/G3X/zp6bN7f//Z93/65Puv7/7rZ9/9/j9u3Pv9/v9/fH/rvx59fOfx1oOn9/7p
-          Z989eLp99/6vHj269+D+f9r/7uN/+N9fPP5ia/vrF9/+73/60+139+8/ur/91T9+
-          /uLzbx88+fTfv/j9b794+ODz3x9t3/3myae/3364f/fh3/7lD9/de/7vD/7x797f
-          +88vP/n91p+3733y0YNPH97//W8e/2Xnx7/55yff/vbh7v8f//z8xT//z3/5/Mv/
-          cv/bv3r0+G/3Hnzz5O8/e/7Z5t/+fvuL77/5/dMfvrz72d/+5sGDx1s//M//evzg
-          757/8fsvP3v60aPvf/tP3/32+7t/86sfP/r84R+/ffhXP371/dZf3f3NnZ/+4o+f
-          fvj84acP7/36T99v/+bF5x/f+/svv/78Xz775M8//tP3/+U/v/vV3X/49SffPv3f
-          39/9/e9/87df/ejZ97/81Xe//f73v/3T/R//bPv+v3719PefPf3r//n0yd88/ubL
-          v/r0N3/z5T/efv7511//48fP73z1b3/1/Z3v/u6P9z96/Nmnv/58a+fffvj7v7t/
-          /7f/7tFf/8ODh1/8x/v/cffB/f/43T988fVnnz/6zfc//s29e7/60ZNP//iPL77d
-          fvbwN5/d+fbeZ3/7+aOnT7a+/19/8+TB/Z99+tGvv/6Xv//u14/e/eGjL/5277O7
-          n3/14IsHD7Z+/ej3f/78i09+8/3X//T4wacPf/Pvf/3Xf/b33/7V0+c/e/zg8ZNH
-          337y9PndrQe//f5f/vY3n377+Pvv/v4vdz7+2e//5tHDh1tffvvF0/vv//r3T7fv
-          /ePDn3z6/eM/fffgF7/66vE/fvr0/l//+y++2f/w7r/+4Y/fff/06T/99t6j3/3+
-          3n/57nff/Yf/+N9Pvv/d51vff/f4f/zh/pNP/8ujf/qf7//j/UePPnnw1W+//7tv
-          f//Fj/781bd/vP/5P/zp4z/98cmDh1/98v5//uPfv/hff/fwwT+9/9e//v3Xn93/
-          60d/8+2Tr//q/k+fPvv63m9/+fX2n/6Xb7b/x/dffvf7r3/88Wff/OOfv/vPj57f
-          +w//+1ePfvH5l/f//t6/fvj440e/ffrFvT9u/+Ovf/nff7T97f2nf/r88V99/v1X
-          //fW5/c/e/zgN0+2/sPvf/P3XzzZ+uMf//bx3X//+3vf/8MfffnNwwdf/ODvvrz7
-          +b1f/vOvfvv83v/38K8+/P3X3z598PnW44f/cOcvf/xvf/j17/74yWf/9uDBnz36
-          89e/evqPv3r07XffPf3rB59v/aeff/f13Z9tff+v7/3p/i8//M9/+/Xf/O1ffPzw
-          T9/f+d9/95NvfvvJk6e//vR/f/rnTz5+9Luvvvv64b2/efq3n3/91T//7tO//f1f
-          ffrfP/rN03/52faffvn7P/31o4d//ujrnz1++OzRdz98/O8e/d1f/vVPPvrsN3/6
-          6d/84Xf/+N0XD3/z1R//+vtvf/HhX/3q0S8/e7z9xZf/47uvvvvXf/vh333/7f/3
-          7e/ufPb0/l//88+e/uvvH3//L189+PDJ1uOf/eavnv/wPz//91s/vv/k6UePP//8
-          y59/9uTz/w90L375
-          ENDB64
-
-          echo "تم بناء ملفات اللعبة بنجاح."
+          # نقل ملف اللعبة إلى أصول أندرويد
+          cp index.html app/src/main/assets/index.html
+          echo "تم تجهيز ملفات اللعبة بنجاح."
 
       - name: تجميع ملف التطبيق (Build APK)
         run: |
@@ -294,12 +194,3 @@ jobs:
           name: Ammar-Arabic-Puzzle-Game-APK
           path: Ammar-Arabic-Puzzle-Game-v1.0.apk
           retention-days: 30
-
-      - name: ملخص تقرير البناء (Step Summary)
-        run: |
-          echo "### 🎮 تم بناء لعبة الألغاز العربية بنجاح! 🚀" >> $GITHUB_STEP_SUMMARY
-          echo "- **تصميم وبرمجة:** عمار الهلالي" >> $GITHUB_STEP_SUMMARY
-          echo "- **عدد المستويات:** 50 مستوى متدرج الصعوبة" >> $GITHUB_STEP_SUMMARY
-          echo "- **نظام الألغاز:** 12 طريقة لغز يتم اختيار 6 منها عشوائياً لكل مرحلة" >> $GITHUB_STEP_SUMMARY
-          echo "- **اسم الملف:** \`Ammar-Arabic-Puzzle-Game-v1.0.apk\`" >> $GITHUB_STEP_SUMMARY
-          echo "- يمكنك تنزيل ملف التطبيق مباشرة من قسم **Artifacts** في أعلى ملخص التشغيل!" >> $GITHUB_STEP_SUMMARY
