@@ -1,0 +1,809 @@
+name: Deploy Brain Training Game
+
+on:
+  push:
+    branches:
+      - main
+      - master
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Build Game Web Application
+        shell: python
+        run: |
+          import os
+
+          os.makedirs('_site', exist_ok=True)
+          html_doc = '''<!DOCTYPE html>
+          <html lang="ar" dir="rtl">
+          <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+            <title>Brain Training: Logic Puzzles | تدريب الدماغ</title>
+            <link rel="preconnect" href="https://fonts.googleapis.com">
+            <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+            <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;600;800;900&display=swap" rel="stylesheet">
+            <style>
+              :root {
+                --bg: #090d16;
+                --card: #151d30;
+                --card-hover: #1e2942;
+                --primary: #6366f1;
+                --cyan: #06b6d4;
+                --emerald: #10b981;
+                --amber: #f59e0b;
+                --rose: #f43f5e;
+                --text: #f8fafc;
+                --muted: #94a3b8;
+                --border: #24304f;
+                --radius: 16px;
+              }
+              * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Tajawal', sans-serif; user-select: none; }
+              body {
+                background: radial-gradient(circle at top, #171d3d 0%, var(--bg) 100%);
+                color: var(--text);
+                min-height: 100vh;
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                padding-bottom: 30px;
+              }
+              header {
+                width: 100%;
+                max-width: 900px;
+                padding: 16px 20px;
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                border-bottom: 1px solid rgba(255,255,255,0.08);
+                position: sticky;
+                top: 0;
+                background: rgba(9, 13, 22, 0.9);
+                backdrop-filter: blur(10px);
+                z-index: 50;
+              }
+              .logo { display: flex; align-items: center; gap: 10px; cursor: pointer; }
+              .logo h1 { font-size: 1.2rem; font-weight: 900; background: linear-gradient(135deg, #a5b4fc, #38bdf8); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+              .logo span { font-size: 0.75rem; color: var(--muted); }
+              .nav-btn { background: var(--card); border: 1px solid var(--border); color: var(--text); width: 38px; height: 38px; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 1.1rem; }
+              .container { width: 100%; max-width: 850px; padding: 16px; flex-grow: 1; display: flex; flex-direction: column; align-items: center; }
+              .screen { display: none; width: 100%; animation: fadeIn 0.25s ease-out; }
+              .screen.active { display: flex; flex-direction: column; align-items: center; }
+              @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+              
+              /* Hub */
+              .hero { text-align: center; margin: 10px 0 24px; }
+              .hero h2 { font-size: 1.6rem; font-weight: 900; margin-bottom: 6px; }
+              .hero p { color: var(--muted); font-size: 0.95rem; }
+              .cat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; width: 100%; }
+              .cat-card {
+                background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px;
+                cursor: pointer; transition: all 0.2s ease; display: flex; flex-direction: column; justify-content: space-between;
+              }
+              .cat-card:hover { transform: translateY(-4px); border-color: var(--primary); box-shadow: 0 0 20px rgba(99, 102, 241, 0.2); }
+              .cat-header { display: flex; align-items: center; gap: 14px; margin-bottom: 10px; }
+              .cat-icon { width: 50px; height: 50px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 1.6rem; }
+              .c-pattern { background: rgba(6,182,212,0.15); color: var(--cyan); }
+              .c-seq { background: rgba(245,158,11,0.15); color: var(--amber); }
+              .c-sort { background: rgba(16,185,129,0.15); color: var(--emerald); }
+              .c-stroop { background: rgba(244,63,94,0.15); color: var(--rose); }
+              .cat-desc { font-size: 0.9rem; color: #cbd5e1; line-height: 1.4; margin-bottom: 16px; }
+              .cat-foot { display: flex; justify-content: space-between; align-items: center; border-top: 1px solid rgba(255,255,255,0.06); padding-top: 12px; }
+              .pill { background: rgba(255,255,255,0.08); padding: 5px 12px; border-radius: 20px; font-size: 0.8rem; font-weight: 600; }
+              .btn-enter { background: var(--primary); color: white; border: none; padding: 7px 14px; border-radius: 10px; font-weight: 700; cursor: pointer; }
+
+              /* Level Selector */
+              .bar { display: flex; justify-content: space-between; align-items: center; width: 100%; margin-bottom: 16px; background: var(--card); padding: 12px 16px; border-radius: 12px; border: 1px solid var(--border); }
+              .lvl-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(62px, 1fr)); gap: 10px; width: 100%; }
+              .lvl-btn {
+                background: var(--card); border: 1px solid var(--border); color: var(--text); height: 60px; border-radius: 12px;
+                display: flex; flex-direction: column; align-items: center; justify-content: center; cursor: pointer; font-size: 1.1rem; font-weight: 700; position: relative;
+              }
+              .lvl-btn:hover:not(.locked) { background: var(--primary); border-color: var(--primary); }
+              .lvl-btn.completed { border-color: var(--emerald); background: rgba(16,185,129,0.1); }
+              .lvl-btn.completed::after { content: '✓'; position: absolute; bottom: 2px; font-size: 0.7rem; color: var(--emerald); }
+              .lvl-btn.locked { opacity: 0.35; cursor: not-allowed; }
+              .lvl-btn.locked::after { content: '🔒'; font-size: 0.75rem; }
+
+              /* Gameplay Common */
+              .board { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 24px 16px; width: 100%; min-height: 400px; display: flex; flex-direction: column; align-items: center; justify-content: center; position: relative; }
+              .hint-btn { background: linear-gradient(135deg, #f59e0b, #d97706); color: #090d16; font-weight: 800; border: none; padding: 7px 14px; border-radius: 10px; cursor: pointer; display: flex; align-items: center; gap: 5px; }
+              .hint-btn:disabled { opacity: 0.4; cursor: not-allowed; filter: grayscale(1); }
+
+              /* Pattern */
+              .pattern-grid { display: grid; gap: 8px; margin: 15px auto; width: 100%; aspect-ratio: 1; }
+              .p-cell { background: rgba(255,255,255,0.06); border: 2px solid rgba(255,255,255,0.1); border-radius: 10px; cursor: pointer; transition: all 0.15s ease; }
+              .p-cell.flash { background: var(--cyan) !important; box-shadow: 0 0 15px var(--cyan); }
+              .p-cell.correct { background: var(--emerald) !important; box-shadow: 0 0 12px var(--emerald); }
+              .p-cell.wrong { background: var(--rose) !important; box-shadow: 0 0 12px var(--rose); }
+              .p-cell.hint { background: var(--amber) !important; box-shadow: 0 0 18px var(--amber); }
+
+              /* Sequences */
+              .seq-text { font-size: 2rem; font-weight: 900; background: rgba(0,0,0,0.3); border: 1px solid var(--border); border-radius: 12px; padding: 20px; width: 100%; max-width: 550px; text-align: center; color: #38bdf8; margin: 15px 0 25px; }
+              .opt-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; width: 100%; max-width: 500px; }
+              .opt-btn { background: var(--card-hover); border: 2px solid var(--border); color: white; padding: 14px; border-radius: 12px; font-size: 1.3rem; font-weight: 800; cursor: pointer; }
+              .opt-btn:hover:not(:disabled) { background: var(--primary); border-color: var(--primary); }
+              .opt-btn.eliminated { opacity: 0.2; cursor: not-allowed; text-decoration: line-through; }
+
+              /* Color Sort */
+              .tubes-wrap { display: flex; flex-wrap: wrap; justify-content: center; gap: 16px; margin: 20px 0; width: 100%; }
+              .tube { width: 58px; height: 210px; border: 3px solid rgba(255,255,255,0.3); border-top: none; border-radius: 0 0 30px 30px; background: rgba(255,255,255,0.03); display: flex; flex-direction: column-reverse; align-items: center; padding: 6px 3px; cursor: pointer; transition: all 0.2s ease; }
+              .tube.selected { border-color: var(--amber); transform: translateY(-10px); box-shadow: 0 8px 20px rgba(245,158,11,0.4); }
+              .tube.hint-src { border-color: var(--amber); box-shadow: 0 0 15px var(--amber); }
+              .tube.hint-dst { border-color: var(--emerald); box-shadow: 0 0 15px var(--emerald); }
+              .ball { width: 44px; height: 44px; border-radius: 50%; margin-top: 4px; box-shadow: inset -2px -2px 6px rgba(0,0,0,0.5), inset 2px 2px 6px rgba(255,255,255,0.3); }
+
+              /* Stroop */
+              .timer-wrap { width: 100%; max-width: 440px; height: 7px; background: rgba(255,255,255,0.1); border-radius: 10px; overflow: hidden; margin-bottom: 20px; }
+              .timer-bar { height: 100%; background: var(--cyan); width: 100%; }
+              .stroop-word { font-size: 3.2rem; font-weight: 900; margin: 15px 0 30px; letter-spacing: 2px; }
+              .stroop-btns { display: flex; gap: 14px; width: 100%; max-width: 440px; }
+              .s-btn { flex: 1; padding: 14px; border-radius: 12px; font-size: 1.2rem; font-weight: 800; cursor: pointer; background: var(--card-hover); border: 2px solid var(--border); color: white; }
+              .s-btn.yes { border-color: var(--emerald); color: var(--emerald); }
+              .s-btn.no { border-color: var(--rose); color: var(--rose); }
+
+              /* Modals & Toast */
+              .modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.8); backdrop-filter: blur(6px); z-index: 100; align-items: center; justify-content: center; padding: 16px; }
+              .modal.active { display: flex; }
+              .modal-box { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 24px; max-width: 500px; width: 100%; }
+              .modal-box h3 { font-size: 1.3rem; margin-bottom: 12px; }
+              .modal-box p, .modal-box li { color: #cbd5e1; font-size: 0.95rem; line-height: 1.6; margin-bottom: 8px; }
+              .modal-box ul { padding-right: 20px; margin-bottom: 20px; }
+              .btn-close { width: 100%; background: var(--primary); color: white; border: none; padding: 11px; border-radius: 10px; font-weight: 700; cursor: pointer; }
+              .toast { position: fixed; bottom: 20px; background: #0284c7; color: white; padding: 10px 20px; border-radius: 30px; font-weight: 700; z-index: 200; transform: translateY(80px); opacity: 0; transition: all 0.25s ease; }
+              .toast.show { transform: translateY(0); opacity: 1; }
+            </style>
+          </head>
+          <body>
+
+            <header>
+              <div class="logo" onclick="showHub()">
+                <div style="font-size: 1.8rem;">🧠</div>
+                <div>
+                  <h1>دكتور العقل: ألغاز المنطق</h1>
+                  <span>Brain Training Logic Puzzles (50 مرحلة لكل نوع)</span>
+                </div>
+              </div>
+              <div style="display:flex; gap:8px;">
+                <button class="nav-btn" title="التعليمات" onclick="showRulesModal()">❓</button>
+                <button class="nav-btn" title="الرئيسية" onclick="showHub()">🏠</button>
+              </div>
+            </header>
+
+            <div class="container">
+              <!-- Hub -->
+              <div id="screen-hub" class="screen active">
+                <div class="hero">
+                  <h2>اختر التحدي العقلي المنطقي</h2>
+                  <p>4 أصناف تدريبية، كل منها يحتوي على 50 مرحلة متدرجة الصعوبة لتدريب كامل مهارات التفكير!</p>
+                </div>
+                <div class="cat-grid">
+                  <div class="cat-card" onclick="openCategory('pattern')">
+                    <div>
+                      <div class="cat-header">
+                        <div class="cat-icon c-pattern">🧩</div>
+                        <div><h3>ذاكرة الأنماط</h3><span style="color:var(--muted); font-size:0.8rem;">Pattern Memory</span></div>
+                      </div>
+                      <div class="cat-desc">احفظ المربعات المضيئة وحدد مواقعها بدقة بعد اختفائها مع زيادة حجم الشبكة والسرعة.</div>
+                    </div>
+                    <div class="cat-foot">
+                      <span class="pill" id="stat-pattern">المرحلة 1 / 50</span>
+                      <button class="btn-enter">دخول ←</button>
+                    </div>
+                  </div>
+
+                  <div class="cat-card" onclick="openCategory('seq')">
+                    <div>
+                      <div class="cat-header">
+                        <div class="cat-icon c-seq">🔢</div>
+                        <div><h3>المتتاليات والمنطق</h3><span style="color:var(--muted); font-size:0.8rem;">Math & Logic Sequences</span></div>
+                      </div>
+                      <div class="cat-desc">اكتشف القاعدة الحسابية والمنطقية الخفية في تسلسل الأعداد لمعرفة الرقم المجهول.</div>
+                    </div>
+                    <div class="cat-foot">
+                      <span class="pill" id="stat-seq">المرحلة 1 / 50</span>
+                      <button class="btn-enter">دخول ←</button>
+                    </div>
+                  </div>
+
+                  <div class="cat-card" onclick="openCategory('sort')">
+                    <div>
+                      <div class="cat-header">
+                        <div class="cat-icon c-sort">🧪</div>
+                        <div><h3>فرز أنابيب الألوان</h3><span style="color:var(--muted); font-size:0.8rem;">Color Tube Sort</span></div>
+                      </div>
+                      <div class="cat-desc">انقل الكرات بين الأنابيب وفق القواعد حتى يصبح كل أنبوب بلون موحد خالص.</div>
+                    </div>
+                    <div class="cat-foot">
+                      <span class="pill" id="stat-sort">المرحلة 1 / 50</span>
+                      <button class="btn-enter">دخول ←</button>
+                    </div>
+                  </div>
+
+                  <div class="cat-card" onclick="openCategory('stroop')">
+                    <div>
+                      <div class="cat-header">
+                        <div class="cat-icon c-stroop">⚡</div>
+                        <div><h3>تحدي التركيز (ستروب)</h3><span style="color:var(--muted); font-size:0.8rem;">Stroop Speed Switch</span></div>
+                      </div>
+                      <div class="cat-desc">تغلب على التشتت الذهني بين معنى الكلمة ولون الخط تحت ضغط المؤقت المتسارع.</div>
+                    </div>
+                    <div class="cat-foot">
+                      <span class="pill" id="stat-stroop">المرحلة 1 / 50</span>
+                      <button class="btn-enter">دخول ←</button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Levels -->
+              <div id="screen-levels" class="screen">
+                <div class="bar">
+                  <div style="display:flex; align-items:center; gap:8px;">
+                    <button class="nav-btn" onclick="showHub()">←</button>
+                    <h2 id="levels-title" style="font-size:1.2rem;">المراحل</h2>
+                  </div>
+                  <button class="hint-btn" onclick="showRulesModal()">قواعد اللعب 📖</button>
+                </div>
+                <div class="lvl-grid" id="levels-grid"></div>
+              </div>
+
+              <!-- Game Board -->
+              <div id="screen-game" class="screen">
+                <div class="bar">
+                  <div style="display:flex; align-items:center; gap:10px;">
+                    <button class="nav-btn" onclick="openCategory(currentCat)">←</button>
+                    <div class="pill">المرحلة: <b id="lvl-num" style="color:var(--cyan);">1</b> / 50</div>
+                    <div class="pill" id="status-pill">جاهز</div>
+                  </div>
+                  <button id="btn-hint" class="hint-btn" onclick="triggerHint()">
+                    💡 مساعدة (<span id="hints-badge">3</span>/3)
+                  </button>
+                </div>
+                <div class="board" id="board-container"></div>
+              </div>
+            </div>
+
+            <!-- Rules Modal -->
+            <div id="modal-rules" class="modal">
+              <div class="modal-box">
+                <h3 id="modal-title">📖 قواعد اللعبة والمساعدات</h3>
+                <div id="modal-desc"></div>
+                <button class="btn-close" onclick="closeRulesModal()">فهمت، لنبدأ!</button>
+              </div>
+            </div>
+
+            <!-- Win Modal -->
+            <div id="modal-win" class="modal">
+              <div class="modal-box" style="text-align:center;">
+                <div style="font-size:3rem; margin-bottom:8px;">🎉</div>
+                <h3 style="color:var(--emerald);">رائع! اجتزت المرحلة بنجاح</h3>
+                <p id="win-desc" style="margin-bottom:20px;">تم تسجيل تقدمك وفتح المرحلة التالية.</p>
+                <div style="display:flex; gap:10px;">
+                  <button class="btn-close" style="background:var(--card-hover);" onclick="openCategory(currentCat)">قائمة المراحل</button>
+                  <button class="btn-close" id="btn-next" onclick="nextStage()">المرحلة التالية ←</button>
+                </div>
+              </div>
+            </div>
+
+            <div id="toast" class="toast"></div>
+
+            <script>
+              // Web Audio Synthesizer
+              let actx = null;
+              function beep(f, t, d) {
+                try {
+                  if (!actx) actx = new (window.AudioContext || window.webkitAudioContext)();
+                  let osc = actx.createOscillator(), g = actx.createGain();
+                  osc.type = t; osc.frequency.setValueAtTime(f, actx.currentTime);
+                  g.gain.setValueAtTime(0.1, actx.currentTime);
+                  g.gain.exponentialRampToValueAtTime(0.001, actx.currentTime + d);
+                  osc.connect(g); g.connect(actx.destination);
+                  osc.start(); osc.stop(actx.currentTime + d);
+                } catch (e) {}
+              }
+              function snd(k) {
+                if (k === 'clk') beep(440, 'sine', 0.06);
+                if (k === 'ok') { beep(523, 'triangle', 0.1); setTimeout(() => beep(659, 'triangle', 0.12), 90); }
+                if (k === 'win') { beep(523, 'triangle', 0.1); setTimeout(() => beep(659, 'triangle', 0.1), 100); setTimeout(() => beep(784, 'triangle', 0.22), 200); }
+                if (k === 'err') beep(220, 'sawtooth', 0.2);
+                if (k === 'hnt') beep(880, 'sine', 0.15);
+              }
+
+              // State
+              const MAX_LVL = 50;
+              const MAX_HINTS = 3;
+              let hints = MAX_HINTS;
+              let currentCat = null;
+              let currentLvl = 1;
+
+              function getProg(c) { return parseInt(localStorage.getItem('bt_prog_' + c) || '1'); }
+              function saveProg(c, l) {
+                if (l > getProg(c)) localStorage.setItem('bt_prog_' + c, Math.min(l, MAX_LVL));
+                updateHub();
+              }
+              function updateHub() {
+                ['pattern', 'seq', 'sort', 'stroop'].forEach(c => {
+                  const el = document.getElementById('stat-' + c);
+                  if (el) el.innerText = `المرحلة ${getProg(c)} / ${MAX_LVL}`;
+                });
+              }
+              function notify(m) {
+                const t = document.getElementById('toast');
+                t.innerText = m; t.classList.add('show');
+                setTimeout(() => t.classList.remove('show'), 2400);
+              }
+              function setScreen(id) {
+                document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+                document.getElementById(id).classList.add('active');
+              }
+              function showHub() {
+                currentCat = null;
+                clearInterval(stroopTimer);
+                setScreen('screen-hub');
+                updateHub();
+              }
+              function openCategory(c) {
+                snd('clk');
+                currentCat = c;
+                const names = { pattern: '🧩 ذاكرة الأنماط', seq: '🔢 المتتاليات والمنطق', sort: '🧪 فرز أنابيب الألوان', stroop: '⚡ تحدي التركيز وستروب' };
+                document.getElementById('levels-title').innerText = names[c];
+                renderLevels();
+                setScreen('screen-levels');
+              }
+              function renderLevels() {
+                const g = document.getElementById('levels-grid');
+                g.innerHTML = '';
+                const unl = getProg(currentCat);
+                for (let i = 1; i <= MAX_LVL; i++) {
+                  const b = document.createElement('button');
+                  b.className = 'lvl-btn';
+                  b.innerText = i;
+                  if (i < unl) { b.classList.add('completed'); b.onclick = () => launch(i); }
+                  else if (i === unl) { b.onclick = () => launch(i); }
+                  else { b.classList.add('locked'); }
+                  g.appendChild(b);
+                }
+              }
+              function launch(lvl) {
+                snd('clk');
+                currentLvl = lvl;
+                hints = MAX_HINTS;
+                updateHintUI();
+                document.getElementById('lvl-num').innerText = lvl;
+                document.getElementById('modal-win').classList.remove('active');
+                setScreen('screen-game');
+                if (currentCat === 'pattern') startPattern();
+                if (currentCat === 'seq') startSeq();
+                if (currentCat === 'sort') startSort();
+                if (currentCat === 'stroop') startStroop();
+              }
+              function updateHintUI() {
+                document.getElementById('hints-badge').innerText = hints;
+                document.getElementById('btn-hint').disabled = hints <= 0;
+              }
+              function triggerHint() {
+                if (hints <= 0) { notify('⚠️ نفدت المساعدات (الحد: 3 مساعدات للمرحلة)!'); return; }
+                hints--;
+                updateHintUI();
+                snd('hnt');
+                if (currentCat === 'pattern') patternHint();
+                if (currentCat === 'seq') seqHint();
+                if (currentCat === 'sort') sortHint();
+                if (currentCat === 'stroop') stroopHint();
+              }
+              function winStage() {
+                snd('win');
+                clearInterval(stroopTimer);
+                saveProg(currentCat, currentLvl + 1);
+                const m = document.getElementById('modal-win');
+                const nb = document.getElementById('btn-next');
+                if (currentLvl >= MAX_LVL) {
+                  document.getElementById('win-desc').innerText = '🎉 إنجاز أسطوري! لقد أنهيت جميع الـ 50 مرحلة في هذا القسم بنجاح تام!';
+                  nb.style.display = 'none';
+                } else {
+                  document.getElementById('win-desc').innerText = `أحسنت! أتممت بنجاح المرحلة ${currentLvl}. جاهز للتحدي القادم؟`;
+                  nb.style.display = 'block';
+                }
+                m.classList.add('active');
+              }
+              function nextStage() { launch(currentLvl + 1); }
+
+              /* 1. PATTERN */
+              let pTargets = [], pFound = [], pClickable = false;
+              function startPattern() {
+                const b = document.getElementById('board-container');
+                const st = document.getElementById('status-pill');
+                st.innerText = 'احفظ النمط المضيء...';
+                let sz = currentLvl <= 10 ? 3 : (currentLvl <= 25 ? 4 : (currentLvl <= 40 ? 5 : 6));
+                let cnt = currentLvl <= 10 ? Math.min(3 + Math.floor((currentLvl-1)/3), 5) :
+                          (currentLvl <= 25 ? 5 + Math.floor((currentLvl-11)/3) :
+                          (currentLvl <= 40 ? 8 + Math.floor((currentLvl-26)/3) : 10 + Math.floor((currentLvl-41)/2)));
+                let tot = sz * sz;
+                let set = new Set();
+                while (set.size < cnt) set.add(Math.floor(Math.random() * tot));
+                pTargets = Array.from(set);
+                pFound = [];
+                pClickable = false;
+                let html = `<div class="pattern-grid" style="grid-template-columns: repeat(${sz}, 1fr); max-width: ${sz * 65}px;">`;
+                for (let i = 0; i < tot; i++) html += `<div class="p-cell" id="pc-${i}" onclick="clickPattern(${i})"></div>`;
+                html += '</div>';
+                b.innerHTML = html;
+
+                setTimeout(() => {
+                  pTargets.forEach(i => document.getElementById('pc-' + i)?.classList.add('flash'));
+                  let wait = Math.max(900, 2000 - currentLvl * 22);
+                  setTimeout(() => {
+                    pTargets.forEach(i => document.getElementById('pc-' + i)?.classList.remove('flash'));
+                    pClickable = true;
+                    st.innerText = `حدد ${pTargets.length} مربعات (${pFound.length}/${pTargets.length})`;
+                  }, wait);
+                }, 400);
+              }
+              function clickPattern(i) {
+                if (!pClickable || pFound.includes(i)) return;
+                const el = document.getElementById('pc-' + i);
+                if (pTargets.includes(i)) {
+                  pFound.push(i);
+                  el.classList.add('correct');
+                  snd('ok');
+                  document.getElementById('status-pill').innerText = `حدد ${pTargets.length} مربعات (${pFound.length}/${pTargets.length})`;
+                  if (pFound.length === pTargets.length) { pClickable = false; setTimeout(winStage, 500); }
+                } else {
+                  el.classList.add('wrong');
+                  snd('err');
+                  pClickable = false;
+                  notify('❌ خطأ! شاهد النمط وحاول مجدداً...');
+                  setTimeout(() => { el.classList.remove('wrong'); startPattern(); }, 900);
+                }
+              }
+              function patternHint() {
+                const rem = pTargets.filter(i => !pFound.includes(i));
+                if (rem.length) {
+                  const el = document.getElementById('pc-' + rem[0]);
+                  el.classList.add('hint');
+                  notify('💡 أضاء أحد المربعات المطلوبة باللون الذهبي!');
+                  setTimeout(() => el.classList.remove('hint'), 1200);
+                }
+              }
+
+              /* 2. SEQUENCES (50 levels generated mathematically) */
+              function getSequence(lvl) {
+                let q, a, wrong, rule;
+                if (lvl <= 5) {
+                  let step = lvl + 1, start = lvl * 2;
+                  q = `${start}, ${start+step}, ${start+step*2}, ${start+step*3}, ?`;
+                  a = start + step * 4;
+                  wrong = [a + 1, a - 1, a + step];
+                  rule = `زيادة منتظمة بمقدار +${step}`;
+                } else if (lvl <= 10) {
+                  let start = lvl - 5;
+                  q = `${start}, ${start*2}, ${start*4}, ${start*8}, ?`;
+                  a = start * 16;
+                  wrong = [a - 2, a + 4, a - 4];
+                  rule = `مضاعفة الرقم (ضرب في 2)`;
+                } else if (lvl <= 15) {
+                  let b = lvl - 10;
+                  q = `${b*b}, ${(b+1)**2}, ${(b+2)**2}, ${(b+3)**2}, ?`;
+                  a = (b+4)**2;
+                  wrong = [a - 5, a + 5, a - 10];
+                  rule = `مربعات الأعداد المتتالية (n²)`;
+                } else if (lvl <= 20) {
+                  let diff = lvl - 13;
+                  q = `${diff*10}, ${diff*10-diff}, ${diff*10-diff*2}, ${diff*10-diff*3}, ?`;
+                  a = diff*10 - diff*4;
+                  wrong = [a - 2, a + 2, a + diff];
+                  rule = `طرح منتظم بمقدار -${diff}`;
+                } else if (lvl <= 30) {
+                  let add = (lvl % 5) + 2, sub = 1;
+                  let s = [10, 10+add, 10+add-sub, 10+add*2-sub, 10+add*2-sub*2];
+                  q = s.join(", ") + ", ?";
+                  a = s[4] + add;
+                  wrong = [a - 1, a + 2, a - 2];
+                  rule = `نمط متناوب: (+${add} ثم -${sub})`;
+                } else if (lvl <= 40) {
+                  let s = [1, 3, 6, 10, 15], off = (lvl - 30);
+                  q = s.map(x => x + off).join(", ") + ", ?";
+                  a = 21 + off;
+                  wrong = [a - 2, a + 3, a - 1];
+                  rule = `أعداد مثلثية بفارق متصاعد (+2, +3, +4, +5, +6)`;
+                } else {
+                  let a1 = (lvl - 40), a2 = (lvl - 39);
+                  let s = [a1, a2, a1+a2, a1+2*a2, 2*a1+3*a2];
+                  q = s.join(", ") + ", ?";
+                  a = 3*a1 + 5*a2;
+                  wrong = [a - 3, a + 4, a - 5];
+                  rule = `متتالية فيبوناتشي: كل عدد هو مجموع العددين السابقين`;
+                }
+                let choices = [a, ...wrong].sort(() => Math.random() - 0.5);
+                return { question: q, answer: String(a), choices: choices.map(String), rule };
+              }
+              let curSeq = null;
+              function startSeq() {
+                const b = document.getElementById('board-container');
+                document.getElementById('status-pill').innerText = 'أوجد الرقم الناقص';
+                curSeq = getSequence(currentLvl);
+                b.innerHTML = `
+                  <div style="width:100%; max-width:550px; text-align:center;">
+                    <div style="font-size:1.05rem; color:var(--muted); margin-bottom:4px;">ما هو الرقم الذي يكمل المتتالية المنطقية؟</div>
+                    <div class="seq-text">${curSeq.question}</div>
+                    <div class="opt-grid">
+                      ${curSeq.choices.map(c => `
+                        <button class="opt-btn" id="sq-${c}" onclick="checkSeq('${c}')">${c}</button>
+                      `).join('')}
+                    </div>
+                  </div>
+                `;
+              }
+              function checkSeq(val) {
+                if (val === curSeq.answer) {
+                  snd('ok');
+                  const btn = document.getElementById('sq-' + val);
+                  btn.style.background = 'var(--emerald)';
+                  btn.style.borderColor = 'var(--emerald)';
+                  setTimeout(winStage, 500);
+                } else {
+                  snd('err');
+                  const btn = document.getElementById('sq-' + val);
+                  btn.classList.add('eliminated');
+                  btn.disabled = true;
+                  notify('❌ إجابة غير صحيحة، حاول مجدداً!');
+                }
+              }
+              function seqHint() {
+                notify(`💡 تلميح: ${curSeq.rule}`);
+                const btns = document.querySelectorAll('.opt-btn:not(.eliminated)');
+                for (let btn of btns) {
+                  if (btn.innerText.trim() !== curSeq.answer) {
+                    btn.classList.add('eliminated');
+                    btn.disabled = true;
+                    break;
+                  }
+                }
+              }
+
+              /* 3. COLOR TUBE SORT */
+              let tubes = [], selTube = null;
+              const PALETTE = ['#ef4444', '#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899'];
+              function startSort() {
+                document.getElementById('status-pill').innerText = 'افرز الكرات في الأنابيب';
+                let nTubes = currentLvl <= 5 ? 3 : (currentLvl <= 15 ? 4 : (currentLvl <= 30 ? 5 : (currentLvl <= 40 ? 6 : 7)));
+                let nColors = currentLvl <= 5 ? 2 : (currentLvl <= 15 ? 3 : (currentLvl <= 30 ? 4 : (currentLvl <= 40 ? 4 : 5)));
+                let steps = 8 + currentLvl * 2;
+                tubes = [];
+                for (let c = 0; c < nColors; c++) tubes.push(Array(4).fill(PALETTE[c]));
+                while (tubes.length < nTubes) tubes.push([]);
+
+                let seed = currentLvl * 997 + 13;
+                function rnd() { seed = (seed * 9301 + 49297) % 233280; return seed / 233280; }
+                for (let s = 0; s < steps; s++) {
+                  let nonEmpty = tubes.map((t, i) => t.length > 0 ? i : -1).filter(i => i !== -1);
+                  let nonFull = tubes.map((t, i) => t.length < 4 ? i : -1).filter(i => i !== -1);
+                  let src = nonEmpty[Math.floor(rnd() * nonEmpty.length)];
+                  let dstOpts = nonFull.filter(i => i !== src);
+                  if (dstOpts.length) {
+                    let dst = dstOpts[Math.floor(rnd() * dstOpts.length)];
+                    tubes[dst].push(tubes[src].pop());
+                  }
+                }
+                selTube = null;
+                drawTubes();
+              }
+              function drawTubes() {
+                const b = document.getElementById('board-container');
+                let html = '<div class="tubes-wrap">';
+                tubes.forEach((t, i) => {
+                  let isSel = selTube === i;
+                  html += `<div class="tube ${isSel ? 'selected' : ''}" id="tb-${i}" onclick="clickTube(${i})">
+                    ${t.map(c => `<div class="ball" style="background:${c};"></div>`).join('')}
+                  </div>`;
+                });
+                html += '</div>';
+                b.innerHTML = html;
+              }
+              function clickTube(i) {
+                snd('clk');
+                if (selTube === null) {
+                  if (tubes[i].length > 0) { selTube = i; drawTubes(); }
+                } else if (selTube === i) {
+                  selTube = null; drawTubes();
+                } else {
+                  let src = selTube, dst = i;
+                  if (tubes[dst].length < 4) {
+                    let ball = tubes[src][tubes[src].length - 1];
+                    if (tubes[dst].length === 0 || tubes[dst][tubes[dst].length - 1] === ball) {
+                      tubes[dst].push(tubes[src].pop());
+                      snd('ok');
+                      selTube = null;
+                      drawTubes();
+                      let won = tubes.every(t => t.length === 0 || (t.length === 4 && t.every(b => b === t[0])));
+                      if (won) setTimeout(winStage, 500);
+                      return;
+                    }
+                  }
+                  snd('err');
+                  selTube = null;
+                  drawTubes();
+                }
+              }
+              function sortHint() {
+                for (let i = 0; i < tubes.length; i++) {
+                  if (tubes[i].length === 0) continue;
+                  let b = tubes[i][tubes[i].length - 1];
+                  for (let j = 0; j < tubes.length; j++) {
+                    if (i === j) continue;
+                    if (tubes[j].length < 4 && (tubes[j].length === 0 || tubes[j][tubes[j].length - 1] === b)) {
+                      let t1 = document.getElementById('tb-' + i), t2 = document.getElementById('tb-' + j);
+                      t1?.classList.add('hint-src'); t2?.classList.add('hint-dst');
+                      notify('💡 انقل الكرة من الأنبوب المحدد بالذهبي إلى الأخضر!');
+                      setTimeout(() => { t1?.classList.remove('hint-src'); t2?.classList.remove('hint-dst'); }, 2000);
+                      return;
+                    }
+                  }
+                }
+                notify('💡 نصيحة: استخدم الأنبوب الفارغ كمنطقة تبديل مؤقتة!');
+              }
+
+              /* 4. STROOP */
+              let stroopTimer = null, sStreak = 0, sTarget = 5, sAns = null;
+              const S_COLORS = [
+                { n: 'أحمر', c: '#ef4444' }, { n: 'أزرق', c: '#3b82f6' },
+                { n: 'أخضر', c: '#10b981' }, { n: 'أصفر', c: '#f59e0b' }, { n: 'بنفسجي', c: '#a855f7' }
+              ];
+              function startStroop() {
+                sStreak = 0;
+                sTarget = Math.min(4 + Math.floor(currentLvl / 6), 11);
+                nextStroop();
+              }
+              function nextStroop() {
+                clearInterval(stroopTimer);
+                const b = document.getElementById('board-container');
+                document.getElementById('status-pill').innerText = `التقدم: ${sStreak} / ${sTarget} إجابات متتالية`;
+                let w = S_COLORS[Math.floor(Math.random() * S_COLORS.length)];
+                let col = S_COLORS[Math.floor(Math.random() * S_COLORS.length)];
+                sAns = (w.n === col.n) ? 'yes' : 'no';
+                b.innerHTML = `
+                  <div style="display:flex; flex-direction:column; align-items:center; width:100%; max-width:440px;">
+                    <div style="font-size:1.15rem; font-weight:700; color:var(--muted); margin-bottom:15px;">هل لون الخط يطابق معنى الكلمة؟</div>
+                    <div class="timer-wrap"><div id="s-tbar" class="timer-bar"></div></div>
+                    <div class="stroop-word" style="color:${col.c};">${w.n}</div>
+                    <div class="stroop-btns">
+                      <button class="s-btn yes" id="btn-s-yes" onclick="ansStroop('yes')">✓ نعم (مطابق)</button>
+                      <button class="s-btn no" id="btn-s-no" onclick="ansStroop('no')">✕ لا (مختلف)</button>
+                    </div>
+                  </div>
+                `;
+                let total = Math.max(1600, 4800 - currentLvl * 65);
+                let elp = 0;
+                const bar = document.getElementById('s-tbar');
+                stroopTimer = setInterval(() => {
+                  elp += 50;
+                  if (bar) bar.style.width = Math.max(0, 100 - (elp / total) * 100) + '%';
+                  if (elp >= total) {
+                    clearInterval(stroopTimer);
+                    snd('err');
+                    notify('⏳ انتهى الوقت!');
+                    sStreak = 0;
+                    setTimeout(nextStroop, 700);
+                  }
+                }, 50);
+              }
+              function ansStroop(ans) {
+                clearInterval(stroopTimer);
+                if (ans === sAns) {
+                  snd('ok');
+                  sStreak++;
+                  if (sStreak >= sTarget) setTimeout(winStage, 400);
+                  else setTimeout(nextStroop, 250);
+                } else {
+                  snd('err');
+                  notify('❌ إجابة خاطئة! عاد العداد للصفر.');
+                  sStreak = 0;
+                  setTimeout(nextStroop, 600);
+                }
+              }
+              function stroopHint() {
+                clearInterval(stroopTimer);
+                notify(`💡 الإجابة هي: ${sAns === 'yes' ? 'نعم (مطابق)' : 'لا (مختلف)'}`);
+                let targetId = sAns === 'yes' ? 'btn-s-yes' : 'btn-s-no';
+                let b = document.getElementById(targetId);
+                if (b) b.style.boxShadow = '0 0 25px var(--amber)';
+              }
+
+              /* Modal Rules */
+              function showRulesModal() {
+                snd('clk');
+                const t = document.getElementById('modal-title');
+                const d = document.getElementById('modal-desc');
+                if (!currentCat) {
+                  t.innerText = '🧠 دليل اللعبة الشامل ونظام المساعدات';
+                  d.innerHTML = `
+                    <ul>
+                      <li><b>4 أنواع من الألعاب العقلية:</b> الذاكرة، المنطق الرياضي، فرز الألوان، وتحدي التركيز.</li>
+                      <li><b>50 مرحلة متدرجة لكل نوع:</b> ترتفع الصعوبة تدريجياً لاختبار أقصى إمكانياتك.</li>
+                      <li><b>حد المساعدات:</b> تملك <b>3 مساعدات فقط كحد أقصى لكل مرحلة</b>. بعد نفادها يُعطّل الزر تماماً حتى تعتمد على ذكائك!</li>
+                      <li><b>حفظ التقدم:</b> يُحفظ مستواك المفتوح في المتصفح تلقائياً.</li>
+                    </ul>
+                  `;
+                } else if (currentCat === 'pattern') {
+                  t.innerText = '🧩 قواعد ذاكرة الأنماط';
+                  d.innerHTML = `
+                    <ul>
+                      <li><b>الهدف:</b> تذكر أماكن المربعات المضيئة باللون السماوي خلال ثوانٍ معدودة.</li>
+                      <li><b>طريقة اللعب:</b> بعد انطفائها، اضغط على جميع المربعات الصحيحة التي حفظتها دون ارتكاب أي خطأ.</li>
+                      <li><b>حد المساعدات (3 كحد أقصى):</b> كل مساعدة تضيء لك مربعاً واحداً صحيحاً بوميض ذهبي.</li>
+                    </ul>
+                  `;
+                } else if (currentCat === 'seq') {
+                  t.innerText = '🔢 قواعد المتتاليات والمنطق الرياضي';
+                  d.innerHTML = `
+                    <ul>
+                      <li><b>الهدف:</b> استنتج القانون الرياضي الخفي الذي يحكم سلسلة الأرقام واختر الرقم الصحيح مكان (؟).</li>
+                      <li><b>التدرج:</b> تبدأ المتتاليات بزيادات حسابية بسيطة وتصل إلى قوى الأعداد، التناوب، ومتتاليات فيبوناتشي المعقدة.</li>
+                      <li><b>حد المساعدات (3 كحد أقصى):</b> توضح لك المساعدة "القاعدة الرياضية" وتستبعد خياراً خاطئاً من الشاشة!</li>
+                    </ul>
+                  `;
+                } else if (currentCat === 'sort') {
+                  t.innerText = '🧪 قواعد فرز أنابيب الألوان';
+                  d.innerHTML = `
+                    <ul>
+                      <li><b>الهدف:</b> إعادة ترتيب الكرات الملونة بحيث يصبح كل أنبوب يحتوي على كرات من لون واحد فقط.</li>
+                      <li><b>طريقة النقل:</b> اضغط على الأنبوب لرفع الكرة العليا، ثم اضغط على الأنبوب المستهدف لإسقاطها.</li>
+                      <li><b>شروط النقل:</b> يمكن إسقاط الكرة فقط في أنبوب فارغ أو فوق كرة تطابقها باللون تماماً مع توفر مساحة.</li>
+                      <li><b>حد المساعدات (3 كحد أقصى):</b> المساعدة ترشدك بالحركة الصحيحة التالية لتفادي المأزق.</li>
+                    </ul>
+                  `;
+                } else if (currentCat === 'stroop') {
+                  t.innerText = '⚡ قواعد تحدي التركيز وسرعة القرار (ستروب)';
+                  d.innerHTML = `
+                    <ul>
+                      <li><b>الهدف:</b> تحديد هل لون خط الكلمة يطابق معناها المكتوب قبل نفاد شريط الوقت السريع.</li>
+                      <li><b>التحدي:</b> مقاومة ميل الدماغ التلقائي لقراءة الكلمة بدلاً من إدراك لونها البصري.</li>
+                      <li><b>شرط الفوز:</b> تحقيق سلسلة متتالية من الإجابات الصحيحة دون أي خطأ.</li>
+                      <li><b>حد المساعدات (3 كحد أقصى):</b> المساعدة توقف المؤقت وتحدد لك الإجابة الصحيحة مباشرة.</li>
+                    </ul>
+                  `;
+                }
+                document.getElementById('modal-rules').classList.add('active');
+              }
+              function closeRulesModal() {
+                snd('clk');
+                document.getElementById('modal-rules').classList.remove('active');
+              }
+
+              window.addEventListener('DOMContentLoaded', updateHub);
+            </script>
+          </body>
+          </html>'''
+          with open('_site/index.html', 'w', encoding='utf-8') as f:
+              f.write(html_doc.strip())
+
+      - name: Setup GitHub Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload Artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: '_site'
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
