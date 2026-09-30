@@ -178,7 +178,7 @@ jobs:
               f.write(make_png(72, 72, (251, 133, 0)))
           "
 
-          # نقل ملف اللعبة إلى أصول أندرويد
+          # نسخ ملف اللعبة
           cp index.html app/src/main/assets/index.html
           echo "تم تجهيز ملفات اللعبة بنجاح."
 
